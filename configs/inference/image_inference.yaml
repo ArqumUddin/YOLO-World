@@ -1,0 +1,36 @@
+# YOLO-World Image Inference Configuration
+# Process a single image with YOLO-World object detection
+
+model:
+  name: "yolo_world_v2_s"
+  display_name: "YOLO-World V2-S"
+  config_file: "configs/pretrain/yolo_world_v2_s_vlpan_bn_2e-4_100e_4x8gpus_obj365v1_goldg_train_lvis_minival.py"
+  checkpoint: "weights/yolo_world_v2_s_obj365v1_goldg_cc3mlite_pretrain-5daf1395.pth"
+
+  text_prompts:
+    - "person"
+    - "car"
+    - "dog"
+    - "cat"
+    - "bicycle"
+
+  confidence_threshold: 0.05
+  nms_threshold: 0.7
+  max_detections: 100
+  device: "cuda"
+
+input:
+  path: "demo/sample_images/bus.jpg"
+  type: "image"
+
+output:
+  directory: "inference_results/image_output"
+  save_annotated: true
+  save_json: true
+  results_filename: "results.json"
+
+visualization:
+  bbox_thickness: 2
+  font_scale: 0.5
+  show_confidence: true
+  show_class_name: true
