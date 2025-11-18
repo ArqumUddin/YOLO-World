@@ -169,17 +169,56 @@ We evaluate all YOLO-World-V2.1 models on LVIS, LVIS-mini, and COCO in the zero-
 
 YOLO-World is developed based on `torch==1.11.0` `mmyolo==0.6.0` and `mmdetection==3.0.0`. Check more details about `requirements` and `mmcv` in [docs/installation](./docs/installation.md).
 
-#### Clone Project 
+#### Clone Project
 
 ```bash
-git clone --recursive https://github.com/AILab-CVC/YOLO-World.git
+git clone --recursive https://github.com/ArqumUddin/YOLO-World.git
 ```
-#### Install
+
+#### Install with Conda (Recommended)
+
+```bash
+conda env create -f environment.yml
+conda activate yolo-world
+```
+
+#### Install with Pip (Alternative)
 
 ```bash
 pip install torch wheel -q
 pip install -e .
 ```
+
+#### Install with Docker
+
+```bash
+# Build the Docker image (includes all model weights ~2.7GB)
+docker build -t yolo-world-inference .
+
+# Run with default config (yolo_world_v2_x_inference.yaml)
+docker run --gpus all yolo-world-inference
+
+# Run with different config (override at runtime, no rebuild needed)
+docker run --gpus all yolo-world-inference --config configs/inference/coco_classes.yaml
+
+# Run with custom config file (mount as volume)
+docker run --gpus all \
+  -v $(pwd)/my_config.yaml:/yolo-world/my_config.yaml \
+  yolo-world-inference --config my_config.yaml
+
+# Run with mounted input/output volumes for processing external files
+docker run --gpus all \
+  -v $(pwd)/input:/input \
+  -v $(pwd)/output:/output \
+  yolo-world-inference --config configs/inference/custom_config.yaml
+```
+
+**Docker Notes:**
+- All model weights (S/M/L/X) are included in the image
+- Config can be overridden at runtime without rebuilding
+- Use `--rm` flag to auto-remove container after execution: `docker run --rm --gpus all ...`
+
+**Note:** NumPy <2.0 is required for compatibility with OpenCV and other dependencies.
 
 ### 2. Preparing Data
 
@@ -228,26 +267,58 @@ YOLO-World supports **zero-shot inference**, and three types of **fine-tuning re
 
 * Reparameterized Fine-tuning: the reparameterized YOLO-World is more suitable for specific domains far from generic scenes. You can find more details in [docs/reparameterize](./docs/reparameterize.md).
 
-## Deployment
+## Inference
 
-We provide the details about deployment for downstream applications in [docs/deployment](./docs/deploy.md).
-You can directly download the ONNX model through the online [demo](https://huggingface.co/spaces/stevengrove/YOLO-World) in Huggingface Spaces 🤗.
+The `inference/` directory provides a complete inference system for running YOLO-World on images and videos. The system uses YAML-based configuration files for easy parameter management and outputs comprehensive detection results.
 
-- [x] ONNX export and demo: [docs/deploy](https://github.com/AILab-CVC/YOLO-World/blob/master/docs/deploy.md)
-- [x] TFLite and INT8 Quantization: [docs/tflite_deploy](https://github.com/AILab-CVC/YOLO-World/blob/master/docs/tflite_deploy.md)
-- [ ] TensorRT: coming soon.
-- [ ] C++: coming soon.
+### Running Inference
 
-## Demo
+**Basic Usage:**
 
-See [`demo`](./demo) for more details
+```bash
+# Run inference with a YAML config file
+PYTHONPATH=./ python inference/inference.py --config configs/inference/coco_classes.yaml
 
-- [x] `gradio_demo.py`: Gradio demo, ONNX export
-- [x] `image_demo.py`: inference with images or a directory of images
-- [x] `simple_demo.py`: a simple demo of YOLO-World, using `array` (instead of path as input).
-- [x] `video_demo.py`: inference YOLO-World on videos.
-- [x] `inference.ipynb`: jupyter notebook for YOLO-World.
-- [x] [Google Colab Notebook](https://colab.research.google.com/drive/1F_7S5lSaFM06irBCZqjhbN7MpUXo6WwO?usp=sharing): We sincerely thank [Onuralp](https://github.com/onuralpszr) for sharing the [Colab Demo](https://colab.research.google.com/drive/1F_7S5lSaFM06irBCZqjhbN7MpUXo6WwO?usp=sharing), you can have a try 😊！
+# Print summary from existing results
+PYTHONPATH=./ python inference/inference.py --print-summary path/to/results.json
+```
+
+### Configuration
+
+Configuration files are located in [configs/inference/](./configs/inference/). A typical config includes:
+
+- **Model settings**: Model size (S/M/L/X/XL), checkpoint path, device (CPU/CUDA)
+- **Detection parameters**: Confidence threshold, NMS threshold, max detections
+- **Text prompts**: List of object classes to detect (open-vocabulary)
+- **Output settings**: Save annotated video/frames, results JSON
+
+Example config structure:
+```yaml
+model:
+  config: "configs/pretrain/yolo_world_v2_l.py"
+  checkpoint: "weights/yolo_world_v2_l_stage1.pth"
+
+detection:
+  text_prompts: ["person", "car", "dog", "cat"]
+  confidence_threshold: 0.05
+
+output:
+  save_annotated: true
+  save_annotated_frames: true
+```
+
+### Output Format
+
+The inference system generates:
+
+- **Annotated video**: Video with bounding boxes and labels
+- **Annotated frames**: Individual frame images (`annotated_frames/`)
+- **results.json**: Comprehensive detection results including:
+  - Frame-by-frame detections with bounding boxes, classes, and confidence scores
+  - Execution metrics (inference time, FPS, time per frame)
+  - GPU memory usage statistics
+  - Model information (size, configuration)
+  - Detection statistics (total detections, detection rate, per-class counts)
 
 ## Acknowledgement
 
@@ -260,8 +331,9 @@ If you find YOLO-World is useful in your research or applications, please consid
 @inproceedings{Cheng2024YOLOWorld,
   title={YOLO-World: Real-Time Open-Vocabulary Object Detection},
   author={Cheng, Tianheng and Song, Lin and Ge, Yixiao and Liu, Wenyu and Wang, Xinggang and Shan, Ying},
+  modifiedby={Arqum Uddin},
   booktitle={Proc. IEEE Conf. Computer Vision and Pattern Recognition (CVPR)},
-  year={2024}
+  year={2025}
 }
 ```
 
