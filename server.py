@@ -1,20 +1,11 @@
 """
 YOLO-World Inference server for REST APIs
 """
-import numpy as np
-from .yolo_world import YOLOWorld
-import cv2
+from inference.server_model import YOLOWorldServer
 from flask import Flask, request, jsonify
-import base64
+import argparse
 
-def str_to_image(img_str: str) -> np.ndarray:
-    """Convert base64 encoded string to numpy image."""
-    img_bytes = base64.b64decode(img_str)
-    img_arr = np.frombuffer(img_bytes, dtype=np.uint8)
-    img_np = cv2.imdecode(img_arr, cv2.IMREAD_ANYCOLOR)
-    return img_np
-
-def host_model(model: 'YOLOWorldServer', name: str, port: int = 5000) -> None:
+def host_model(model: YOLOWorldServer, name: str, port: int = 5000) -> None:
     """
     Host a model as a REST API using Flask.
 
@@ -32,40 +23,7 @@ def host_model(model: 'YOLOWorldServer', name: str, port: int = 5000) -> None:
 
     app.run(host="localhost", port=port)
 
-class YOLOWorldServer(YOLOWorld):
-    """YOLO-World server that handles REST API requests."""
-
-    def process_payload(self, payload: dict) -> dict:
-        """
-        Process incoming prediction request.
-
-        Args:
-            payload: Dictionary containing:
-                - image: Base64 encoded image string
-                - caption: Optional string or list of class names to detect
-
-        Returns:
-            Dictionary containing detection results
-        """
-        img_np = str_to_image(payload["image"])
-        caption = payload.get("caption", None)
-
-        if caption is not None:
-            if isinstance(caption, str):
-                prompts = [[c.strip()] for c in caption.rstrip(" .").split(" . ")]
-            elif isinstance(caption, list):
-                prompts = [[c.strip()] for c in caption]
-            else:
-                prompts = None
-        else:
-            prompts = None
-
-        predictions = self.predict(image=img_np, prompts=prompts)
-        return predictions.to_dict()
-
 if __name__ == "__main__":
-    import argparse
-
     parser = argparse.ArgumentParser(
         description="YOLO-World REST API Server"
     )
