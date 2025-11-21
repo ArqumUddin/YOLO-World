@@ -3,13 +3,11 @@ import yaml
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
-
 class InferenceConfig:
     """
     Configuration class for YOLO-World inference.
     Parses and validates YAML configuration files.
     """
-
     def __init__(self, config_path: str):
         """
         Initialize configuration from YAML file.

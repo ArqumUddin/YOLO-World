@@ -1,7 +1,6 @@
 """
 YOLO-World Inference server for REST APIs
 """
-
 import numpy as np
 from .yolo_world import YOLOWorld
 import cv2
@@ -14,7 +13,6 @@ def str_to_image(img_str: str) -> np.ndarray:
     img_arr = np.frombuffer(img_bytes, dtype=np.uint8)
     img_np = cv2.imdecode(img_arr, cv2.IMREAD_ANYCOLOR)
     return img_np
-
 
 def host_model(model: 'YOLOWorldServer', name: str, port: int = 5000) -> None:
     """
@@ -33,7 +31,6 @@ def host_model(model: 'YOLOWorldServer', name: str, port: int = 5000) -> None:
         return jsonify(model.process_payload(payload))
 
     app.run(host="localhost", port=port)
-
 
 class YOLOWorldServer(YOLOWorld):
     """YOLO-World server that handles REST API requests."""
@@ -65,7 +62,6 @@ class YOLOWorldServer(YOLOWorld):
 
         predictions = self.predict(image=img_np, prompts=prompts)
         return predictions.to_dict()
-
 
 if __name__ == "__main__":
     import argparse

@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from typing import List, Tuple, Optional
 import numpy as np
 
-
 @dataclass
 class BoundingBox:
     """
@@ -53,7 +52,6 @@ class BoundingBox:
             'height': float(self.height)
         }
 
-
 @dataclass
 class Detection:
     """
@@ -72,7 +70,6 @@ class Detection:
             'confidence': float(self.confidence),
             'class_id': int(self.class_id) if self.class_id is not None else None
         }
-
 
 @dataclass
 class FrameDetections:

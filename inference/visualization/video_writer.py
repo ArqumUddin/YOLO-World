@@ -1,18 +1,15 @@
 """
 Video writer for creating annotated videos from frames.
 """
-
 import cv2
 import os
 from typing import List
 import numpy as np
 
-
 class AnnotatedVideoWriter:
     """
     Create annotated videos from individual frames.
     """
-
     def __init__(
         self,
         output_path: str,

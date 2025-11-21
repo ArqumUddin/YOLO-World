@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
-from detection_result import FrameDetections
+from .detection_result import FrameDetections
 
 
 class ResultsWriter:

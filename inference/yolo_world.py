@@ -13,8 +13,9 @@ from mmdet.apis import init_detector
 from mmdet.utils import get_test_pipeline_cfg
 from mmyolo.registry import RUNNERS
 from torchvision.ops import nms
+from yolo_world.models import *
 
-from detection_result import Detection, BoundingBox, FrameDetections
+from .detection_result import Detection, BoundingBox, FrameDetections
 
 
 class YOLOWorld:
@@ -190,7 +191,7 @@ class YOLOWorld:
 
         for i, image in enumerate(images):
             frame_id = start_frame_id + i
-            frame_detections = self.predict(image, frame_id)
+            frame_detections = self.predict(image=image, frame_id=frame_id)
             all_detections.append(frame_detections)
 
         return all_detections

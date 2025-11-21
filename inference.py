@@ -24,15 +24,12 @@ from typing import List, Tuple
 import traceback
 from tqdm import tqdm
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from config import InferenceConfig
+from inference.config import InferenceConfig
+from inference.visualization.annotator import FrameAnnotator
+from inference.visualization.video_writer import AnnotatedVideoWriter
+from inference.results_writer import ResultsWriter
+from inference.gpu_memory_tracker import GPUMemoryTracker
 from inference.yolo_world import YOLOWorld
-from visualization.annotator import FrameAnnotator
-from visualization.video_writer import AnnotatedVideoWriter
-from results_writer import ResultsWriter
-from gpu_memory_tracker import GPUMemoryTracker
-
 
 def load_video_frames(video_path: str) -> Tuple[List[np.ndarray], float, int]:
     """
@@ -193,12 +190,8 @@ def run_inference(config: InferenceConfig):
     print("Running inference...")
     start_inference = time.time()
 
-    from tqdm import tqdm
-    all_detections = []
-    for i, frame in enumerate(tqdm(frames, desc="Processing frames")):
-        frame_det = model.predict_frame(frame, frame_id=i)
-        all_detections.append(frame_det)
-        gpu_tracker.record_snapshot()
+    all_detections = model.predict_frames(frames, start_frame_id=0)
+    gpu_tracker.record_snapshot()
 
     inference_time = time.time() - start_inference
 
@@ -223,7 +216,6 @@ def run_inference(config: InferenceConfig):
         print("\nSaving annotated frames...")
         os.makedirs(config.annotated_frames_dir, exist_ok=True)
 
-        from tqdm import tqdm
         for idx, (frame, frame_det) in enumerate(tqdm(
             zip(frames, all_detections),
             desc="Saving frames",

@@ -3,9 +3,7 @@ import numpy as np
 from typing import List, Tuple, Optional, Dict
 import sys
 
-sys.path.append('..')
-from detection_result import Detection, FrameDetections
-
+from inference.detection_result import Detection, FrameDetections
 
 class FrameAnnotator:
     """

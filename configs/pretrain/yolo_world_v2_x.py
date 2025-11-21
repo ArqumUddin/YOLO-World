@@ -99,16 +99,6 @@ flickr_train_dataset = dict(
     filter_cfg=dict(filter_empty_gt=True, min_size=32),
     pipeline=train_pipeline)
 
-# train_dataloader = dict(batch_size=train_batch_size_per_gpu,
-#                         collate_fn=dict(type='yolow_collate'),
-#                         dataset=dict(_delete_=True,
-#                                      type='ConcatDataset',
-#                                      datasets=[
-#                                          obj365v1_train_dataset,
-#                                          flickr_train_dataset, mg_train_dataset
-#                                      ],
-#                                      ignore_keys=['classes', 'palette']))
-
 test_pipeline = [
     *_base_.test_pipeline[:-1],
     dict(type='LoadText'),
@@ -116,24 +106,6 @@ test_pipeline = [
          meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
                     'scale_factor', 'pad_param', 'texts'))
 ]
-# coco_val_dataset = dict(
-#     _delete_=True,
-#     type='MultiModalDataset',
-#     dataset=dict(type='YOLOv5LVISV1Dataset',
-#                  data_root='data/coco/',
-#                  test_mode=True,
-#                  ann_file='lvis/lvis_v1_minival_inserted_image_name.json',
-#                  data_prefix=dict(img=''),
-#                  batch_shapes_cfg=None),
-#     class_text_path='data/texts/lvis_v1_class_texts.json',
-#     pipeline=test_pipeline)
-# val_dataloader = dict(dataset=coco_val_dataset)
-# test_dataloader = val_dataloader
-
-# val_evaluator = dict(type='mmdet.LVISMetric',
-#                      ann_file='data/coco/lvis/lvis_v1_minival_inserted_image_name.json',
-#                      metric='bbox')
-# test_evaluator = val_evaluator
 
 # training settings
 default_hooks = dict(param_scheduler=dict(max_epochs=max_epochs),
