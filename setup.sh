@@ -20,6 +20,19 @@ else
     conda env create -f environment.yml
 fi
 
+# Initialize conda for bash
+eval "$(conda shell.bash hook)"
+
+# Activate environment and install PyTorch
+echo "Activating yolo-world environment..."
+conda activate yolo-world
+
+echo "Installing PyTorch packages with CUDA 11.8..."
+pip install torch==2.0.1+cu118 torchvision==0.15.2+cu118 torchaudio==2.0.2+cu118 \
+    --index-url https://download.pytorch.org/whl/cu118
+
+pip install mmcv==2.0.0 -f https://download.openmmlab.com/mmcv/dist/cu118/torch2.0/index.html
+
 # Setup third_party/mmyolo
 echo "Setting up third_party/mmyolo..."
 mkdir -p third_party

@@ -4,6 +4,7 @@ YOLO-World Inference server for REST APIs
 Supports both YAML config files and command-line arguments.
 """
 from inference.server_model import YOLOWorldServer
+from inference.config import ServerConfig
 from flask import Flask, request, jsonify
 import argparse
 import yaml
@@ -78,17 +79,15 @@ Examples:
         if not yaml_path.exists():
             raise FileNotFoundError(f"YAML config not found: {args.yaml_config}")
 
-        with open(yaml_path, 'r') as f:
-            config = yaml.safe_load(f)
-
-        model_config = config.get('model', {})
-        config_path = model_config.get('config_file')
-        checkpoint_path = model_config.get('checkpoint')
-        text_prompts = model_config.get('text_prompts', [])
-        device = model_config.get('device', 'cuda')
-        confidence = model_config.get('confidence_threshold', 0.25)
-        nms = model_config.get('nms_threshold', 0.7)
-        max_detections = model_config.get('max_detections', 100)
+        processed_server_config = ServerConfig(yaml_path)
+        model_config = processed_server_config.model_name
+        config_path = processed_server_config.config_file
+        checkpoint_path = processed_server_config.checkpoint
+        text_prompts = processed_server_config.text_prompts
+        device = processed_server_config.device
+        confidence = processed_server_config.confidence_threshold
+        nms = processed_server_config.nms_threshold
+        max_detections = processed_server_config.max_detections
 
         print(f"Loaded config from: {args.yaml_config}")
     else:

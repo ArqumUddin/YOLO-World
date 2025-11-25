@@ -9,6 +9,7 @@ from .detection_result import Detection, BoundingBox, FrameDetections
 from .results_writer import ResultsWriter
 from .visualization import FrameAnnotator, AnnotatedVideoWriter
 from .server_model import YOLOWorldServer
+from .config import ServerConfig, InferenceConfig
 
 __all__ = [
     'YOLOWorld',
@@ -20,5 +21,7 @@ __all__ = [
     'FrameAnnotator',
     'AnnotatedVideoWriter',
     'host_model',
-    'str_to_image'
+    'str_to_image',
+    'ServerConfig',
+    'InferenceConfig'
 ]

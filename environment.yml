@@ -77,7 +77,6 @@ dependencies:
       - markupsafe==2.1.5
       - matplotlib==3.8.2
       - mdurl==0.1.2
-      - mmcv==2.0.0
       - mmdet==3.0.0
       - mmengine==0.10.7
       - mmyolo==0.6.0
@@ -106,9 +105,6 @@ dependencies:
       - terminaltables==3.1.10
       - tokenizers==0.15.2
       - tomli==2.3.0
-      - torch==2.0.1+cu118
-      - torchaudio==2.0.2+cu118
-      - torchvision==0.15.2+cu118
       - tqdm==4.66.1
       - transformers==4.36.2
       - triton==2.0.0
