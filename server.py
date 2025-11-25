@@ -1,9 +1,13 @@
 """
 YOLO-World Inference server for REST APIs
+
+Supports both YAML config files and command-line arguments.
 """
 from inference.server_model import YOLOWorldServer
 from flask import Flask, request, jsonify
 import argparse
+import yaml
+from pathlib import Path
 
 def host_model(model: YOLOWorldServer, name: str, port: int = 5000) -> None:
     """
@@ -21,64 +25,119 @@ def host_model(model: YOLOWorldServer, name: str, port: int = 5000) -> None:
         payload = request.json
         return jsonify(model.process_payload(payload))
 
-    app.run(host="localhost", port=port)
+    app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="YOLO-World REST API Server"
+        description="YOLO-World REST API Server",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Using YAML config file
+  python server.py --yaml-config configs/inference/yolo_world_v2_x_inference.yaml
+
+  # Using command-line arguments
+  python server.py \\
+      --config configs/pretrain/yolo_world_v2_l.py \\
+      --checkpoint weights/yolo_world_v2_l_stage1.pth \\
+      --prompts "person,car,dog"
+        """
     )
 
+    # Add mutually exclusive group for config methods
+    config_group = parser.add_mutually_exclusive_group(required=True)
+    config_group.add_argument("--yaml-config", type=str,
+                        help="Path to YAML config file (e.g., configs/inference/*.yaml)")
+    config_group.add_argument("--config", type=str,
+                        help="Path to YOLO-World model config file (.py)")
+
+    # Optional arguments for command-line mode
+    parser.add_argument("--checkpoint", type=str,
+                        help="Path to YOLO-World checkpoint file")
+    parser.add_argument("--prompts", type=str,
+                        help="Comma-separated list of class names")
+    parser.add_argument("--device", type=str,
+                        help="Device to use (cuda/cpu)")
+    parser.add_argument("--confidence", type=float,
+                        help="Confidence threshold")
+    parser.add_argument("--nms", type=float,
+                        help="NMS IoU threshold")
+    parser.add_argument("--max-detections", type=int,
+                        help="Maximum detections per image")
+
+    # Server options
     parser.add_argument("--port", type=int, default=12182,
                         help="Port to run the server on (default: 12182)")
-    parser.add_argument("--config", type=str, required=True,
-                        help="Path to YOLO-World config file")
-    parser.add_argument("--checkpoint", type=str, required=True,
-                        help="Path to YOLO-World checkpoint file")
-    parser.add_argument("--prompts", type=str, default="person,car,dog,cat,bird",
-                        help="Comma-separated list of class names (default: person,car,dog,cat,bird)")
-    parser.add_argument("--device", type=str, default=None,
-                        help="Device to use (cuda/cpu, default: auto-detect)")
-    parser.add_argument("--confidence", type=float, default=0.25,
-                        help="Confidence threshold (default: 0.25)")
-    parser.add_argument("--nms", type=float, default=0.7,
-                        help="NMS IoU threshold (default: 0.7)")
-    parser.add_argument("--max-detections", type=int, default=100,
-                        help="Maximum detections per image (default: 100)")
 
     args = parser.parse_args()
 
-    # Parse prompts
-    text_prompts = [p.strip() for p in args.prompts.split(",")]
+    # Load configuration
+    if args.yaml_config:
+        # Load from YAML file
+        yaml_path = Path(args.yaml_config)
+        if not yaml_path.exists():
+            raise FileNotFoundError(f"YAML config not found: {args.yaml_config}")
+
+        with open(yaml_path, 'r') as f:
+            config = yaml.safe_load(f)
+
+        model_config = config.get('model', {})
+        config_path = model_config.get('config_file')
+        checkpoint_path = model_config.get('checkpoint')
+        text_prompts = model_config.get('text_prompts', [])
+        device = model_config.get('device', 'cuda')
+        confidence = model_config.get('confidence_threshold', 0.25)
+        nms = model_config.get('nms_threshold', 0.7)
+        max_detections = model_config.get('max_detections', 100)
+
+        print(f"Loaded config from: {args.yaml_config}")
+    else:
+        # Use command-line arguments
+        if not args.checkpoint or not args.prompts or args.config:
+            parser.error("--checkpoint, --config, and --prompts are required when not using --yaml-config")
+
+        config_path = args.config
+        checkpoint_path = args.checkpoint
+        text_prompts = [p.strip() for p in args.prompts.split(",")]
+        device = args.device
+        confidence = args.confidence or 0.25
+        nms = args.nms or 0.7
+        max_detections = args.max_detections or 100
 
     print("=" * 80)
     print("YOLO-World Server Initialization")
     print("=" * 80)
-    print(f"Config: {args.config}")
-    print(f"Checkpoint: {args.checkpoint}")
-    print(f"Device: {args.device or 'auto-detect'}")
+    print(f"Model Config: {config_path}")
+    print(f"Checkpoint: {checkpoint_path}")
+    print(f"Device: {device or 'auto-detect'}")
     print(f"Port: {args.port}")
-    print(f"Prompts: {text_prompts}")
-    print(f"Confidence threshold: {args.confidence}")
-    print(f"NMS threshold: {args.nms}")
-    print(f"Max detections: {args.max_detections}")
+    print(f"Prompts ({len(text_prompts)}): {text_prompts}")
+    print(f"Confidence threshold: {confidence}")
+    print(f"NMS threshold: {nms}")
+    print(f"Max detections: {max_detections}")
     print("=" * 80)
     print("\nLoading model...")
 
     # Initialize server
     yolo_server = YOLOWorldServer(
-        config_path=args.config,
-        checkpoint_path=args.checkpoint,
+        config_path=config_path,
+        checkpoint_path=checkpoint_path,
         text_prompts=text_prompts,
-        device=args.device,
-        confidence_threshold=args.confidence,
-        nms_threshold=args.nms,
-        max_detections=args.max_detections
+        device=device,
+        confidence_threshold=confidence,
+        nms_threshold=nms,
+        max_detections=max_detections
     )
 
     print("\n" + "=" * 80)
-    print(f"Model loaded!")
-    print(f"Server ready! Listening on http://localhost:{args.port}/yolo_world")
+    print(f"✓ Model loaded successfully!")
+    print(f"✓ Server ready! Listening on http://0.0.0.0:{args.port}/yolo_world")
     print("=" * 80)
+    print("\nExample request:")
+    print(f"  curl -X POST http://localhost:{args.port}/yolo_world \\")
+    print('    -H "Content-Type: application/json" \\')
+    print('    -d \'{"image": "<base64_encoded_image>", "caption": "person . car . dog ."}\'')
+    print("=" * 80 + "\n")
 
     # Start server
     host_model(yolo_server, name="yolo_world", port=args.port)

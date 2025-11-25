@@ -37,10 +37,7 @@ python -m inference --config configs/inference/coco_classes.yaml
 
 **Start API Server:**
 ```bash
-python -m inference.server \
-    --config configs/pretrain/yolo_world_v2_l.py \
-    --checkpoint weights/yolo_world_v2_l_stage1.pth \
-    --prompts "person,car,dog,cat"
+python server.py --yaml-config configs/inference/yolo_world_v2_x_inference.yaml
 ```
 
 ---
@@ -106,13 +103,18 @@ output:
 
 ### REST API Server
 
-**Start Server:**
+**Start Server (YAML Config - Recommended):**
 ```bash
-python -m inference.server \
+python server.py --yaml-config configs/inference/yolo_world_v2_x_inference.yaml
+```
+
+**Start Server (Command-line):**
+```bash
+python server.py \
     --config configs/pretrain/yolo_world_v2_l.py \
     --checkpoint weights/yolo_world_v2_l_stage1.pth \
-    --port 12182 \
-    --prompts "person,car,dog,cat,bird"
+    --prompts "person,car,dog,cat,bird" \
+    --port 12182
 ```
 
 **Client Code:**
@@ -136,10 +138,10 @@ print(f"Found {response.json()['num_detections']} objects")
 ```
 
 **Server Options:**
+- `--yaml-config`: Use YAML config file (easiest)
+- `--config` + `--checkpoint` + `--prompts`: Manual configuration
 - `--port`: Port number (default: 12182)
-- `--device`: cuda/cpu (auto-detect)
-- `--confidence`: Threshold (default: 0.05)
-- `--nms`: NMS threshold (default: 0.7)
+- `--device`, `--confidence`, `--nms`: Override defaults
 
 ---
 
