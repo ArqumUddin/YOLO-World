@@ -7,7 +7,7 @@ class YOLOWorldServer(YOLOWorld):
     """
     YOLO-World server that handles REST API requests.
     """
-    def str_to_image(img_str: str) -> np.ndarray:
+    def str_to_image(self, img_str: str) -> np.ndarray:
         """Convert base64 encoded string to numpy image."""
         img_bytes = base64.b64decode(img_str)
         img_arr = np.frombuffer(img_bytes, dtype=np.uint8)
