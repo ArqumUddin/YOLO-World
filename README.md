@@ -179,33 +179,29 @@ All models are automatically downloaded by `setup.sh`. Manual downloads availabl
 ./tools/dist_test.sh path/to/config path/to/weights 8
 ```
 
-### Fine-tuning Options
+### Fine-tuning
 
-1. **Normal Fine-tuning**: [docs/finetuning.md](./docs/finetuning.md)
-2. **Prompt Tuning**: [docs/prompt_yolo_world.md](./docs/prompt_yolo_world.md)
-3. **Reparameterized Fine-tuning**: [docs/reparameterize.md](./docs/reparameterize.md)
+Fine-tuning scripts and configurations are available in `configs/finetune_coco/`. See training examples above for usage.
 
 ---
 
 ## Advanced
 
-### Documentation
-- [Data Preparation](./docs/data.md)
-- [Configuration Guide](./docs/)
+### Resources
 - [FAQ](https://github.com/AILab-CVC/YOLO-World/discussions/149)
-- [Roadmap](https://github.com/AILab-CVC/YOLO-World/issues/109)
+- [Feature Roadmap](https://github.com/AILab-CVC/YOLO-World/issues/109)
+- [HuggingFace Spaces Demo](https://huggingface.co/spaces/stevengrove/YOLO-World)
 
 ### Integrations
-- [HuggingFace Spaces](https://huggingface.co/spaces/stevengrove/YOLO-World)
-- [ComfyUI](https://github.com/StevenGrove/ComfyUI-YOLOWorld)
-- [FiftyOne](https://docs.voxel51.com/integrations/ultralytics.html)
-- [Roboflow](https://inference.roboflow.com/foundation/yolo_world/)
+- [ComfyUI Plugin](https://github.com/StevenGrove/ComfyUI-YOLOWorld)
+- [FiftyOne Toolkit](https://docs.voxel51.com/integrations/ultralytics.html)
+- [Roboflow Deployment](https://inference.roboflow.com/foundation/yolo_world/)
 
-### Updates
+### Latest Updates
 
-**Latest (2025-02-08):** YOLO-World V2.1 released with improved weights and image prompt support. See [update notes](./docs/update_20250123.md).
+**2025-02-08:** YOLO-World V2.1 released with improved weights and image prompt support.
 
-**CVPR 2024:** Paper accepted at Computer Vision and Pattern Recognition 2024.
+**2024:** Paper accepted at CVPR 2024.
 
 ---
 
