@@ -126,5 +126,4 @@ work_dirs
 venus_run.sh
 
 results/
-configs/inference/yolo*
 
