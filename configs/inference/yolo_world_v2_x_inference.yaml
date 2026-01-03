@@ -2,7 +2,7 @@ model:
   name: "yolo_world_v2_X"
   display_name: "YOLO-World V2-X"
 
-  config_file: "configs/pretrain/yolo_world_v2_x.py"
+  config_file: "configs/inference/yolo_world_v2_x.py"
   checkpoint: "weights/yolo_world_v2_x_stage1.pth"
 
   text_prompts:
