@@ -1,0 +1,33 @@
+model:
+  name: "yolo_world_v2_X"
+  display_name: "YOLO-World V2-X"
+
+  config_file: "configs/pretrain/yolo_world_v2_x.py"
+  checkpoint: "weights/yolo_world_v2_x_stage1.pth"
+
+  text_prompts:
+    - "coffee bag"
+    - "coffee mug"
+    - "map"
+    - "backpack"
+    - "hiking boots"
+    - "sneakers"
+    - "hiking pole"
+    - "water bottle"
+    - "sunscreen bottle"
+    - "sun hat"
+    - "headlamp"
+    - "reading glasses"
+    - "barbers pole"
+    - "dirty boots"
+
+  confidence_threshold: 0.25
+  nms_threshold: 0.4
+  max_detections: 100
+  device: "cuda"
+
+visualization:
+  bbox_thickness: 2
+  font_scale: 0.6
+  show_confidence: true
+  show_class_name: true
