@@ -359,10 +359,14 @@ class YOLOWorldHead(YOLOv8Head):
         """Perform forward propagation and loss calculation of the detection
         head on the features of the upstream network."""
 
+        outputs = unpack_gt_instances(batch_data_samples)
+        (batch_gt_instances, batch_gt_instances_ignore,
+         batch_img_metas) = outputs
+
         outs = self(img_feats, txt_feats, txt_masks)
-        # Fast version
-        loss_inputs = outs + (batch_data_samples['bboxes_labels'],
-                              batch_data_samples['img_metas'])
+
+        loss_inputs = outs + (txt_masks, batch_gt_instances, batch_img_metas,
+                              batch_gt_instances_ignore)
         losses = self.loss_by_feat(*loss_inputs)
 
         return losses

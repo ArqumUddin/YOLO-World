@@ -5,12 +5,12 @@ model_size = 'l'
 
 # ==============================================================================
 
-_base_ = (f'../../third_party/mmyolo/configs/yolov8/'
-          f'yolov8_{model_size}_mask-refine_syncbn_fast_8xb16-500e_coco.py')
+_base_ = ('../../third_party/mmyolo/configs/yolov8/'
+          'yolov8_l_mask-refine_syncbn_fast_8xb16-500e_coco.py')
 custom_imports = dict(imports=['yolo_world'], allow_failed_imports=False)
 
 # hyper-parameters
-num_classes = 77  # YCB classes count (approx)
+num_classes = 55  # YCB classes count (actual)
 num_training_classes = num_classes
 max_epochs = 80
 close_mosaic_epochs = 10
@@ -21,11 +21,12 @@ neck_num_heads = [4, 8, _base_.last_stage_out_channels // 2 // 32]
 base_lr = 2e-4
 weight_decay = 0.05
 # Optimized for 4x NVIDIA L40S (48GB VRAM)
-# 48GB allows ~32-64 batch size for YOLOv8-L.
-# Global Batch Size = 32 * 4 GPUs = 128 (matches standard YOLOv8 base config 8xb16)
-train_batch_size_per_gpu = 32 
+# 4x L40S has ~45GB usable per GPU. 
+# Batch 48 caused OOM. Reducing to 32.
+train_batch_size_per_gpu = 24
 train_num_workers = 8
-load_from = f'weights/yolo_world_v2_{model_size}_stage2.pth'
+load_from = 'weights/yolo_world_v2_l_stage2.pth'
+resume = True
 text_model_name = 'openai/clip-vit-base-patch32'
 persistent_workers = True
 
@@ -35,35 +36,39 @@ model = dict(
     mm_neck=True,
     num_train_classes=num_training_classes,
     num_test_classes=num_training_classes,
-    data_preprocessor=dict(type='YOLOWDetDataPreprocessor'),
+    data_preprocessor=dict(type='mmdet.DetDataPreprocessor',
+                           mean=[0.0, 0.0, 0.0],
+                           std=[255.0, 255.0, 255.0],
+                           bgr_to_rgb=True),
     backbone=dict(
         _delete_=True,
-        type='SimpleStemMultiModalRotatedBackbone',
-        backbone_cfg=dict(
+        type='MultiModalYOLOBackbone',
+        image_model=dict(
             type='YOLOv8CSPDarknet',
             arch='P5',
             last_stage_out_channels=_base_.last_stage_out_channels,
             norm_cfg=_base_.norm_cfg,
-            act_cfg=_base_.act_cfg,
+            act_cfg=dict(type='SiLU', inplace=True),
             deepen_factor=_base_.deepen_factor,
-            widen_factor=_base_.widen_factor,
-            init_cfg=_base_.init_cfg),
-        text_model_cfg=dict(
-            type='CLIPTextModel',
+            widen_factor=_base_.widen_factor),
+        text_model=dict(
+            type='HuggingCLIPLanguageBackbone',
             model_name=text_model_name,
             frozen_modules=['all'])),
     neck=dict(type='YOLOWorldPAFPN',
               guide_channels=text_channels,
               embed_channels=neck_embed_channels,
               num_heads=neck_num_heads,
-              block_cfg=dict(type='MaxSigmoidCSPLayerWithTwoConv'),
-              text_enhancerv2=dict(type='ImagePoolingAttentionModule',
-                                   embed_channels=256,
-                                   num_heads=8)),
+              block_cfg=dict(type='MaxSigmoidCSPLayerWithTwoConv')),
     bbox_head=dict(type='YOLOWorldHead',
                    head_module=dict(type='YOLOWorldHeadModule',
                                     embed_dims=text_channels,
-                                    num_classes=num_training_classes)),
+                                    num_classes=num_training_classes,
+                                    reg_max=16),
+                   loss_dfl=dict(
+                       type='mmdet.DistributionFocalLoss',
+                       reduction='mean',
+                       loss_weight=1.5 / 4)),
     train_cfg=dict(assigner=dict(num_classes=num_training_classes)))
 
 # dataset settings
@@ -98,6 +103,7 @@ text_transform = [
 ]
 
 train_dataset = dict(
+    _delete_=True,
     type='MultiModalDataset',
     dataset=dict(
         type='YOLOv5CocoDataset',
@@ -112,7 +118,7 @@ train_dataloader = dict(
     persistent_workers=persistent_workers,
     batch_size=train_batch_size_per_gpu,
     num_workers=train_num_workers,
-    collate_fn=dict(type='yolow_collate'),
+    collate_fn=dict(type='pseudo_collate'), # Override base collate with default pseudo_collate
     dataset=train_dataset
 )
 
@@ -125,6 +131,7 @@ test_pipeline = [
 ]
 
 val_dataset = dict(
+    _delete_=True,
     type='MultiModalDataset',
     dataset=dict(
         type='YOLOv5CocoDataset',
@@ -138,6 +145,7 @@ val_dataset = dict(
 val_dataloader = dict(dataset=val_dataset)
 
 test_dataset = dict(
+    _delete_=True,
     type='MultiModalDataset',
     dataset=dict(
         type='YOLOv5CocoDataset',
@@ -191,3 +199,5 @@ val_evaluator = dict(_delete_=True,
                      proposal_nums=(100, 1, 10),
                      ann_file='data/sdg/dataset/val.json',
                      metric='bbox')
+
+visualizer = dict(vis_backends=[dict(type='LocalVisBackend'), dict(type='WandbVisBackend')])
