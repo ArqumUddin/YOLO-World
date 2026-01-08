@@ -10,6 +10,13 @@
 
 </div>
 
+## Custom Modifications
+
+We have added tools for co-finetuning with Synthetic Data Generation (SDG) and YCB objects:
+- **Inference Demo**: `configs/inference/inference_demo.py` allows testing model with YCB vocabulary or empty prompts.
+- **Co-fine-tuning Config**: `configs/cofinetune/yolo_world_v2_cofinetune_sdg.py` configured for SDG + COCO + LVIS mixed training.
+- **SDG Dataset Tools**: Scripts for generating text prompts and preparing synthetic data.
+
 ## Table of Contents
 - [Quick Start](#quick-start)
 - [Installation](#installation)

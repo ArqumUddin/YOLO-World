@@ -127,3 +127,12 @@ venus_run.sh
 
 results/
 
+
+# Custom Ignore
+data/
+weights/
+work_dirs/
+demo_outputs/
+sdg_output/
+*.pth
+*.pt
