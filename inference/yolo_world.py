@@ -140,7 +140,7 @@ class YOLOWorld:
                 pred_instances['labels'],
                 pred_instances['scores']
             ):
-                class_name = self.texts[int(label_id)][0]
+                class_name = prompts[int(label_id)][0]
 
                 bbox = BoundingBox(
                     x_min=float(bbox_coords[0]),
