@@ -1,0 +1,41 @@
+# YOLO-World Video Inference Configuration
+# Process a video with YOLO-World object detection
+
+model:
+  name: "yolo_world_v2_X"
+  display_name: "YOLO-World V2-X"
+
+  config_file: "configs/inference/yolo_world_v2_x.py"
+  checkpoint: "weights/yolo_world_v2_x_stage1.pth"
+
+  text_prompts:
+    - "white sneakers"
+    - "umbrella"
+    - "red boots"
+    - "rain boots"
+    - "keys"
+    - "shoes"
+    - "water flask"
+    - "basket"
+    - "coat"
+
+  confidence_threshold: 0.3
+  nms_threshold: 0.7
+  max_detections: 100
+  device: "cuda"
+
+input:
+  path: "/home/ubuntu/Workspace/full_sized_original_video.mp4"
+  type: "video"
+
+output:
+  directory: "inference_results/"
+  save_annotated: true
+  save_json: true
+  results_filename: "results.json"
+
+visualization:
+  bbox_thickness: 2
+  font_scale: 0.5
+  show_confidence: true
+  show_class_name: true
