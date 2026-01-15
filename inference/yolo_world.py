@@ -17,7 +17,6 @@ from yolo_world.models import *
 
 from .detection_result import Detection, BoundingBox, FrameDetections
 
-
 class YOLOWorld:
     """
     Wrapper for YOLO-World model to provide a clean inference interface.
