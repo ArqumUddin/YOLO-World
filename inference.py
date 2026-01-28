@@ -23,14 +23,11 @@ import traceback
 from inference.config import InferenceConfig
 from inference.gpu_memory_tracker import GPUMemoryTracker
 from inference.yolo_world import YOLOWorld
+from inference.results_writer import ResultsWriter
 from inference.utils import (
-    get_unique_output_directory,
-    save_inference_results,
-    load_video_frames,
-    load_image,
-    load_images_from_directory
+    prepare_inference_input,
+    save_inference_results
 )
-
 
 def run_inference(config: InferenceConfig):
     """
@@ -39,35 +36,8 @@ def run_inference(config: InferenceConfig):
     Args:
         config: InferenceConfig object with all parameters
     """
-    input_path = Path(config.input_path)
-    input_type = config.input_type
-    is_video = input_type == 'video'
-    is_directory = input_type == 'directory'
-
-    # Create subdirectory named after the input file (with timestamp if exists)
-    input_stem = input_path.stem
-    output_directory = get_unique_output_directory(config.output_directory, input_stem)
-    os.makedirs(output_directory, exist_ok=True)
-
-    print(f"Input: {config.input_path}")
-    print(f"Type: {input_type}")
-    print(f"Output directory: {output_directory}")
-
-    start_load = time.time()
-    image_filenames = None  # Track filenames for directory mode
-
-    if is_video:
-        frames, fps, total_frames = load_video_frames(config.input_path)
-    elif is_directory:
-        frames, image_filenames = load_images_from_directory(config.input_path)
-        fps = None
-        total_frames = len(frames)
-    else:
-        frames = [load_image(config.input_path)]
-        fps = None
-        total_frames = 1
-    load_time = time.time() - start_load
-    print(f"Input loading time: {load_time:.2f} seconds\n")
+    # Load and prepare input (shared preprocessing logic)
+    input_data = prepare_inference_input(config)
 
     gpu_tracker = GPUMemoryTracker(device=config.device)
     if gpu_tracker.cuda_available:
@@ -90,40 +60,39 @@ def run_inference(config: InferenceConfig):
     print("Running inference...")
     start_inference = time.time()
 
-    all_detections = model.predict_frames(frames, start_frame_id=0)
+    all_detections = model.predict_frames(input_data.frames, start_frame_id=0)
     gpu_tracker.record_snapshot()
 
     inference_time = time.time() - start_inference
 
     print(f"\nInference completed in {inference_time:.2f} seconds")
-    print(f"Average time per frame: {inference_time / len(frames):.4f} seconds")
-    print(f"Inference FPS: {len(frames) / inference_time:.2f}")
+    print(f"Average time per frame: {inference_time / len(input_data.frames):.4f} seconds")
+    print(f"Inference FPS: {len(input_data.frames) / inference_time:.2f}")
 
     total_detections = sum(len(fd.detections) for fd in all_detections)
     frames_with_detections = sum(1 for fd in all_detections if len(fd.detections) > 0)
     print(f"\nTotal detections: {total_detections}")
-    print(f"Frames with detections: {frames_with_detections}/{len(frames)}")
-    print(f"Average detections per frame: {total_detections / len(frames):.2f}")
+    print(f"Frames with detections: {frames_with_detections}/{len(input_data.frames)}")
+    print(f"Average detections per frame: {total_detections / len(input_data.frames):.2f}")
 
     # Save all results using shared function
     gpu_memory_summary = gpu_tracker.get_summary()
 
     save_inference_results(
-        frames=frames,
+        frames=input_data.frames,
         all_detections=all_detections,
-        output_directory=output_directory,
+        output_directory=input_data.output_directory,
         config=config,
         input_path=config.input_path,
-        input_type=input_type,
-        fps=fps,
-        total_frames=total_frames,
+        input_type=input_data.input_type,
+        fps=input_data.fps,
+        total_frames=input_data.total_frames,
         inference_time=inference_time,
         text_prompts=config.text_prompts,
         gpu_memory_summary=gpu_memory_summary,
         model_size_mb=model_size_mb,
-        image_filenames=image_filenames
+        image_filenames=input_data.image_filenames
     )
-
 
 def run_from_config(config_path: str):
     """
@@ -136,7 +105,6 @@ def run_from_config(config_path: str):
     config = InferenceConfig(config_path)
     print(config)
     run_inference(config)
-
 
 def main():
     """Main CLI entry point."""

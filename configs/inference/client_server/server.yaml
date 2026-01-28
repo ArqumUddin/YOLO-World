@@ -1,0 +1,33 @@
+model:
+  name: "yolo_world_v2_X"
+  display_name: "YOLO-World V2-X"
+
+  config_file: "configs/inference/yolo_world_v2_x.py"
+  checkpoint: "weights/yolo_world_v2_x_stage1.pth"
+
+  text_prompts:
+    - "toothbrush"
+    - "chair"
+    - "stool"
+    - "armchair"
+    - "bread"
+    - "soda can"
+    - "water bottle"
+    - "cheese"
+    - "fruits"
+    - "fruit bowl"
+    - "black umbrella"
+    - "wrist watch"
+    - "lunchbox"
+    - "hammer"
+    - "tape"
+    - "bread"
+    - "safe"
+
+  confidence_threshold: 0.35
+  nms_threshold: 0.75
+  max_detections: 100
+  device: "cuda"
+
+server:
+  port: 12182

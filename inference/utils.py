@@ -5,17 +5,29 @@ Utility functions for YOLO-World inference.
 import os
 import cv2
 import base64
+import time
 import numpy as np
 import requests
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Any, Tuple, NamedTuple
 from tqdm import tqdm
 
 from .visualization.annotator import FrameAnnotator
 from .visualization.video_writer import AnnotatedVideoWriter
 from .results_writer import ResultsWriter
 from .detection_result import FrameDetections, Detection, BoundingBox
+
+class InferenceInput(NamedTuple):
+    """Container for loaded inference input data."""
+    frames: List[np.ndarray]
+    fps: Optional[float]
+    total_frames: int
+    image_filenames: Optional[List[str]]
+    output_directory: str
+    input_type: str
+    input_path: Path
+    load_time: float
 
 
 def load_video_frames(video_path: str) -> Tuple[List[np.ndarray], float, int]:
@@ -120,6 +132,63 @@ def load_images_from_directory(directory_path: str) -> Tuple[List[np.ndarray], L
     print(f"Successfully loaded {len(images)} images")
 
     return images, loaded_filenames
+
+
+def prepare_inference_input(config) -> InferenceInput:
+    """
+    Prepare input for inference: load frames/images and create output directory.
+
+    This function handles all input preprocessing for both inference.py and client.py,
+    eliminating code duplication.
+
+    Args:
+        config: InferenceConfig object with input_path, input_type, output_directory
+
+    Returns:
+        InferenceInput object containing all loaded data and metadata
+    """
+    input_path = Path(config.input_path)
+    input_type = config.input_type
+    is_video = input_type == 'video'
+    is_directory = input_type == 'directory'
+
+    # Create subdirectory named after the input file (with timestamp if exists)
+    input_stem = input_path.stem
+    output_directory = get_unique_output_directory(config.output_directory, input_stem)
+    os.makedirs(output_directory, exist_ok=True)
+
+    print(f"Input: {config.input_path}")
+    print(f"Type: {input_type}")
+    print(f"Output directory: {output_directory}")
+
+    # Load input based on type
+    start_load = time.time()
+    image_filenames = None  # Track filenames for directory mode
+
+    if is_video:
+        frames, fps, total_frames = load_video_frames(config.input_path)
+    elif is_directory:
+        frames, image_filenames = load_images_from_directory(config.input_path)
+        fps = None
+        total_frames = len(frames)
+    else:
+        frames = [load_image(config.input_path)]
+        fps = None
+        total_frames = 1
+
+    load_time = time.time() - start_load
+    print(f"Input loading time: {load_time:.2f} seconds\n")
+
+    return InferenceInput(
+        frames=frames,
+        fps=fps,
+        total_frames=total_frames,
+        image_filenames=image_filenames,
+        output_directory=output_directory,
+        input_type=input_type,
+        input_path=input_path,
+        load_time=load_time
+    )
 
 
 def encode_frame(frame_rgb: np.ndarray) -> str:

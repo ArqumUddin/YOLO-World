@@ -94,6 +94,11 @@ class ServerConfig:
         return self.config['model'].get('device', None)
 
     @property
+    def port(self) -> Optional[int]:
+        """Get server port (optional)."""
+        return self.config.get('server', {}).get('port', None)
+
+    @property
     def bbox_thickness(self) -> int:
         """Get bounding box thickness."""
         return self.config.get('visualization', {}).get('bbox_thickness', 2)
@@ -345,5 +350,191 @@ class InferenceConfig:
             f"  Directory: {self.output_directory}",
             f"  Save annotated: {self.save_annotated_video}",
             f"  Save JSON: {self.save_results_json}",
+        ]
+        return "\n".join(lines)
+
+
+class ClientConfig:
+    """
+    Configuration class for YOLO-World client-server inference client.
+    Parses and validates YAML configuration files.
+    """
+    def __init__(self, config_path: str):
+        """
+        Initialize configuration from YAML file.
+
+        Args:
+            config_path: Path to YAML configuration file
+        """
+        self.config_path = config_path
+        self.config = self._load_config()
+        self._validate_config()
+
+    def _load_config(self) -> Dict[str, Any]:
+        """Load YAML configuration file."""
+        if not os.path.exists(self.config_path):
+            raise FileNotFoundError(f"Configuration file not found: {self.config_path}")
+
+        with open(self.config_path, 'r') as f:
+            config = yaml.safe_load(f)
+
+        if config is None:
+            raise ValueError(f"Empty configuration file: {self.config_path}")
+
+        return config
+
+    def _validate_config(self):
+        """Validate required configuration parameters."""
+        required_fields = ['input', 'output']
+
+        for field in required_fields:
+            if field not in self.config:
+                raise ValueError(f"Missing required configuration field: {field}")
+
+        if 'path' not in self.config['input']:
+            raise ValueError("Input configuration must include 'path'")
+
+        input_path = self.config['input']['path']
+        if not os.path.exists(input_path):
+            raise FileNotFoundError(f"Input path does not exist: {input_path}")
+
+        # Validate that if it's a directory, it contains image files
+        if os.path.isdir(input_path):
+            image_extensions = {'.jpg', '.jpeg', '.png', '.bmp'}
+            image_files = [f for f in os.listdir(input_path)
+                          if os.path.splitext(f)[1].lower() in image_extensions]
+            if not image_files:
+                raise ValueError(f"Directory contains no image files: {input_path}")
+
+        if 'directory' not in self.config['output']:
+            raise ValueError("Output configuration must include 'directory'")
+
+    @property
+    def input_path(self) -> str:
+        """Get input path (video or image)."""
+        return self.config['input']['path']
+
+    @property
+    def input_type(self) -> str:
+        """
+        Get input type (video, image, or directory).
+        Auto-detected if not specified.
+        """
+        if 'type' in self.config['input']:
+            return self.config['input']['type']
+
+        path = Path(self.input_path)
+        if path.is_dir():
+            return 'directory'
+        elif path.is_file():
+            ext = path.suffix.lower()
+            if ext in ['.mp4', '.avi', '.mov', '.mkv', '.flv', '.webm']:
+                return 'video'
+            elif ext in ['.jpg', '.jpeg', '.png', '.bmp']:
+                return 'image'
+
+        raise ValueError(f"Cannot determine input type for: {self.input_path}")
+
+    @property
+    def output_directory(self) -> str:
+        """Get output directory."""
+        return self.config['output']['directory']
+
+    @property
+    def save_annotated_video(self) -> bool:
+        """Whether to save annotated video/image."""
+        return self.config['output'].get('save_annotated', True)
+
+    @property
+    def save_annotated_frames(self) -> bool:
+        """Whether to save individual annotated frames."""
+        return self.config['output'].get('save_annotated_frames', True)
+
+    @property
+    def annotated_frames_dir(self) -> str:
+        """Get directory for annotated frames."""
+        frames_dir = self.config['output'].get('annotated_frames_dir', 'annotated_frames')
+        return os.path.join(self.output_directory, frames_dir)
+
+    @property
+    def save_results_json(self) -> bool:
+        """Whether to save results JSON."""
+        return self.config['output'].get('save_json', True)
+
+    @property
+    def results_filename(self) -> str:
+        """Get results JSON filename."""
+        return self.config['output'].get('results_filename', 'results.json')
+
+    @property
+    def bbox_thickness(self) -> int:
+        """Get bounding box thickness."""
+        return self.config.get('visualization', {}).get('bbox_thickness', 2)
+
+    @property
+    def font_scale(self) -> float:
+        """Get font scale for labels."""
+        return self.config.get('visualization', {}).get('font_scale', 0.5)
+
+    @property
+    def show_confidence(self) -> bool:
+        """Whether to show confidence scores."""
+        return self.config.get('visualization', {}).get('show_confidence', True)
+
+    @property
+    def show_class_name(self) -> bool:
+        """Whether to show class names."""
+        return self.config.get('visualization', {}).get('show_class_name', True)
+
+    @property
+    def server_url(self) -> str:
+        """Get server URL for client requests."""
+        return self.config.get('client', {}).get('server_url', 'http://localhost:12182/yolo_world')
+
+    @property
+    def config_file(self) -> Optional[str]:
+        """Model config file (not available on client)."""
+        return None
+
+    @property
+    def checkpoint(self) -> Optional[str]:
+        """Model checkpoint (not available on client)."""
+        return None
+
+    @property
+    def text_prompts(self) -> List[str]:
+        """Text prompts (client sends only via CLI)."""
+        return []
+
+    @property
+    def model_name(self) -> str:
+        """Model name/identifier."""
+        return self.config.get('client', {}).get('model_name', 'yolo_world')
+
+    @property
+    def display_name(self) -> Optional[str]:
+        """Display name for the model (optional)."""
+        return self.config.get('client', {}).get('display_name', None)
+
+    def __repr__(self) -> str:
+        return f"ClientConfig(config_path='{self.config_path}')"
+
+    def __str__(self) -> str:
+        """Print configuration."""
+        lines = [
+            "=== YOLO-World Client Configuration ===",
+            f"Config file: {self.config_path}",
+            "",
+            "Input:",
+            f"  Path: {self.input_path}",
+            f"  Type: {self.input_type}",
+            "",
+            "Output:",
+            f"  Directory: {self.output_directory}",
+            f"  Save annotated: {self.save_annotated_video}",
+            f"  Save JSON: {self.save_results_json}",
+            "",
+            "Client:",
+            f"  Server URL: {self.server_url}",
         ]
         return "\n".join(lines)

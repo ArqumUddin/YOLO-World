@@ -35,7 +35,7 @@ if __name__ == "__main__":
         epilog="""
 Examples:
   # Using YAML config file
-  python server.py --yaml-config configs/inference/yolo_world_v2_x_inference.yaml
+  python server.py --yaml-config configs/inference/client_server/server.yaml
 
   # Using command-line arguments
   python server.py \\
@@ -80,7 +80,6 @@ Examples:
             raise FileNotFoundError(f"YAML config not found: {args.yaml_config}")
 
         processed_server_config = ServerConfig(yaml_path)
-        model_config = processed_server_config.model_name
         config_path = processed_server_config.config_file
         checkpoint_path = processed_server_config.checkpoint
         text_prompts = processed_server_config.text_prompts
@@ -88,6 +87,7 @@ Examples:
         confidence = processed_server_config.confidence_threshold
         nms = processed_server_config.nms_threshold
         max_detections = processed_server_config.max_detections
+        port = processed_server_config.port or args.port
 
         print(f"Loaded config from: {args.yaml_config}")
     else:
@@ -102,6 +102,7 @@ Examples:
         confidence = args.confidence or 0.25
         nms = args.nms or 0.7
         max_detections = args.max_detections or 100
+        port = args.port
 
     print("=" * 80)
     print("YOLO-World Server Initialization")
@@ -109,7 +110,7 @@ Examples:
     print(f"Model Config: {config_path}")
     print(f"Checkpoint: {checkpoint_path}")
     print(f"Device: {device or 'auto-detect'}")
-    print(f"Port: {args.port}")
+    print(f"Port: {port}")
     print(f"Prompts ({len(text_prompts)}): {text_prompts}")
     print(f"Confidence threshold: {confidence}")
     print(f"NMS threshold: {nms}")
@@ -130,13 +131,13 @@ Examples:
 
     print("\n" + "=" * 80)
     print(f"✓ Model loaded successfully!")
-    print(f"✓ Server ready! Listening on http://0.0.0.0:{args.port}/yolo_world")
+    print(f"✓ Server ready! Listening on http://0.0.0.0:{port}/yolo_world")
     print("=" * 80)
     print("\nExample request:")
-    print(f"  curl -X POST http://localhost:{args.port}/yolo_world \\")
+    print(f"  curl -X POST http://localhost:{port}/yolo_world \\")
     print('    -H "Content-Type: application/json" \\')
     print('    -d \'{"image": "<base64_encoded_image>", "caption": "person . car . dog ."}\'')
     print("=" * 80 + "\n")
 
     # Start server
-    host_model(yolo_server, name="yolo_world", port=args.port)
+    host_model(yolo_server, name="yolo_world", port=port)
