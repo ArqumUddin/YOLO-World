@@ -1,5 +1,5 @@
 input:
-  path: "/home/ubuntu/Workspace/data/sdg"
+  path: "/path/to/directory/with/annotations"
   type: "directory"
 
 output:
@@ -16,3 +16,12 @@ visualization:
 
 client:
   server_url: http://localhost:12182/yolo_world
+
+evaluation:
+  # Enable evaluation by defining this block.
+  # input.path must be the COCO dataset root and contain annotations.json.
+  iou_thresholds: [0.5]
+  min_score: 0.0
+  per_image_metrics: true
+  coco_verbose: false
+  output_filename: "evaluation.json"
