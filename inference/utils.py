@@ -134,6 +134,42 @@ def load_images_from_directory(directory_path: str) -> Tuple[List[np.ndarray], L
     return images, loaded_filenames
 
 
+def load_images_from_list(base_dir: str, file_names: List[str]) -> Tuple[List[np.ndarray], List[str]]:
+    """
+    Load images from a list of file names, resolving relative paths against base_dir.
+
+    Args:
+        base_dir: Base directory for relative file paths
+        file_names: List of file names or relative paths
+
+    Returns:
+        Tuple of (images list, image filenames list)
+    """
+    print(f"Loading {len(file_names)} images using COCO file list...")
+
+    images = []
+    loaded_filenames = []
+
+    for file_name in file_names:
+        if not file_name:
+            continue
+        image_path = file_name if os.path.isabs(file_name) else os.path.join(base_dir, file_name)
+        try:
+            image = cv2.imread(image_path)
+            if image is not None:
+                image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                images.append(image_rgb)
+                loaded_filenames.append(file_name)
+            else:
+                print(f"Warning: Could not load {file_name}, skipping...")
+        except Exception as e:
+            print(f"Warning: Error loading {file_name}: {e}, skipping...")
+
+    print(f"Successfully loaded {len(images)} images")
+
+    return images, loaded_filenames
+
+
 def prepare_inference_input(config) -> InferenceInput:
     """
     Prepare input for inference: load frames/images and create output directory.
@@ -148,6 +184,7 @@ def prepare_inference_input(config) -> InferenceInput:
         InferenceInput object containing all loaded data and metadata
     """
     input_path = Path(config.input_path)
+    load_path = Path(config.input_path)
     input_type = config.input_type
     is_video = input_type == 'video'
     is_directory = input_type == 'directory'
@@ -158,6 +195,8 @@ def prepare_inference_input(config) -> InferenceInput:
     os.makedirs(output_directory, exist_ok=True)
 
     print(f"Input: {config.input_path}")
+    if load_path != input_path:
+        print(f"Resolved images dir: {load_path}")
     print(f"Type: {input_type}")
     print(f"Output directory: {output_directory}")
 
@@ -166,13 +205,18 @@ def prepare_inference_input(config) -> InferenceInput:
     image_filenames = None  # Track filenames for directory mode
 
     if is_video:
-        frames, fps, total_frames = load_video_frames(config.input_path)
+        frames, fps, total_frames = load_video_frames(str(load_path))
     elif is_directory:
-        frames, image_filenames = load_images_from_directory(config.input_path)
+        eval_file_names = getattr(config, "eval_image_filenames", None)
+        if eval_file_names:
+            base_dir = str(load_path)
+            frames, image_filenames = load_images_from_list(base_dir, eval_file_names)
+        else:
+            frames, image_filenames = load_images_from_directory(str(load_path))
         fps = None
         total_frames = len(frames)
     else:
-        frames = [load_image(config.input_path)]
+        frames = [load_image(str(load_path))]
         fps = None
         total_frames = 1
 
@@ -362,34 +406,8 @@ def save_inference_results(
         font_scale=config.font_scale
     )
 
-    # Save annotated frames
-    if config.save_annotated_frames:
-        print("\nSaving annotated frames...")
-        frames_dir = config.config['output'].get('annotated_frames_dir', 'annotated_frames')
-        annotated_frames_dir = os.path.join(output_directory, frames_dir)
-        os.makedirs(annotated_frames_dir, exist_ok=True)
-
-        for idx, (frame, frame_det) in enumerate(tqdm(
-            zip(frames, all_detections),
-            desc="Saving frames",
-            total=len(frames)
-        )):
-            annotated_frame = annotator.annotate_frame(frame, frame_det)
-
-            # Use original filename for directory mode, otherwise use frame numbering
-            if is_directory and image_filenames:
-                filename = f"{Path(image_filenames[idx]).stem}_annotated{Path(image_filenames[idx]).suffix}"
-            else:
-                filename = f"frame_{frame_det.frame_id:06d}.jpg"
-            output_path = os.path.join(annotated_frames_dir, filename)
-
-            annotated_bgr = cv2.cvtColor(annotated_frame, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(output_path, annotated_bgr)
-
-        print(f"Annotated frames saved to: {annotated_frames_dir}")
-
     # Save annotated video
-    if config.save_annotated_video and is_video:
+    if config.save_annotated and is_video:
         print("\nGenerating annotated video...")
         output_video_path = os.path.join(
             output_directory,
@@ -408,7 +426,7 @@ def save_inference_results(
         print(f"Annotated video saved to: {output_video_path}")
 
     # Save annotated single image
-    if config.save_annotated_video and not is_video and not is_directory:
+    if config.save_annotated and not is_video and not is_directory:
         print("\nGenerating annotated image...")
         output_image_path = os.path.join(
             output_directory,
@@ -422,7 +440,7 @@ def save_inference_results(
         print(f"Annotated image saved to: {output_image_path}")
 
     # Save annotated images for directory mode
-    if config.save_annotated_video and is_directory:
+    if config.save_annotated and is_directory:
         print("\nGenerating annotated images for directory...")
         annotated_images_dir = os.path.join(output_directory, "annotated_images")
         os.makedirs(annotated_images_dir, exist_ok=True)

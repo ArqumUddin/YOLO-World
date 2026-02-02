@@ -19,6 +19,7 @@ from tqdm import tqdm
 
 from inference.config import ClientConfig
 from inference.detection_result import FrameDetections
+from inference.evaluation import COCOEvaluator
 from inference.utils import (
     prepare_inference_input,
     save_inference_results,
@@ -111,6 +112,62 @@ def run_client_inference(config: ClientConfig, server_url: str, text_prompts: Li
         model_size_mb=0.0,  # Not available on client side
         image_filenames=input_data.image_filenames
     )
+
+    # Optional evaluation (COCO dataset)
+    if config.eval_coco_annotations:
+        if not input_data.image_filenames:
+            raise ValueError("Evaluation requires directory input with image filenames.")
+
+        detections_by_filename = {
+            input_data.image_filenames[i]: det for i, det in enumerate(all_detections)
+        }
+
+        evaluator = COCOEvaluator(
+            annotations_path=config.eval_coco_annotations,
+            iou_thresholds=config.eval_iou_thresholds,
+            min_score=config.eval_min_score,
+            per_image_metrics=config.eval_per_image_metrics,
+        )
+        eval_results = evaluator.evaluate_dataset(
+            detections_by_filename,
+            verbose=config.eval_coco_verbose,
+        )
+        eval_output_path = os.path.join(input_data.output_directory, config.eval_output_filename)
+        COCOEvaluator.write_results(eval_output_path, eval_results)
+        print(f"\nEvaluation results saved to: {eval_output_path}")
+        _print_eval_summary(eval_results)
+
+
+def _print_eval_summary(eval_results: dict) -> None:
+    summary = eval_results.get("coco_eval", {}).get("summary", {})
+    named = summary.get("named", {}) if isinstance(summary, dict) else {}
+    per_image = eval_results.get("per_image", {}).get("aggregate", {})
+
+    if named:
+        print("\n=== Evaluation Summary (COCOEval) ===")
+        print(f"AP: {named.get('AP', 0):.4f}")
+        print(f"AP50: {named.get('AP50', 0):.4f}")
+        print(f"AP75: {named.get('AP75', 0):.4f}")
+        print(f"AR@1: {named.get('AR_1', 0):.4f}")
+        print(f"AR@10: {named.get('AR_10', 0):.4f}")
+        print(f"AR@100: {named.get('AR_100', 0):.4f}")
+    else:
+        lines = summary.get("lines", []) if isinstance(summary, dict) else []
+        if lines:
+            print("\n=== Evaluation Summary (COCOEval) ===")
+            for line in lines:
+                print(line)
+
+    if per_image:
+        print("\n=== Evaluation Summary (Per-Image) ===")
+        for key, metrics in per_image.items():
+            print(
+                f"{key}: "
+                f"P={metrics.get('precision', 0):.4f} "
+                f"R={metrics.get('recall', 0):.4f} "
+                f"F1={metrics.get('f1', 0):.4f} "
+                f"IoU={metrics.get('mean_iou', 0):.4f}"
+            )
 
 def main():
     """Main CLI entry point."""

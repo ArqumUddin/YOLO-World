@@ -1,4 +1,5 @@
 import os
+import json
 import yaml
 from typing import Dict, Any, Optional, List
 from pathlib import Path
@@ -279,20 +280,9 @@ class InferenceConfig:
         return self.config['output']['directory']
 
     @property
-    def save_annotated_video(self) -> bool:
-        """Whether to save annotated video/image."""
+    def save_annotated(self) -> bool:
+        """Whether to save annotated outputs (video/image/frames)."""
         return self.config['output'].get('save_annotated', True)
-
-    @property
-    def save_annotated_frames(self) -> bool:
-        """Whether to save individual annotated frames."""
-        return self.config['output'].get('save_annotated_frames', True)
-
-    @property
-    def annotated_frames_dir(self) -> str:
-        """Get directory for annotated frames."""
-        frames_dir = self.config['output'].get('annotated_frames_dir', 'annotated_frames')
-        return os.path.join(self.output_directory, frames_dir)
 
     @property
     def save_results_json(self) -> bool:
@@ -348,7 +338,7 @@ class InferenceConfig:
             "",
             "Output:",
             f"  Directory: {self.output_directory}",
-            f"  Save annotated: {self.save_annotated_video}",
+            f"  Save annotated: {self.save_annotated}",
             f"  Save JSON: {self.save_results_json}",
         ]
         return "\n".join(lines)
@@ -368,6 +358,9 @@ class ClientConfig:
         """
         self.config_path = config_path
         self.config = self._load_config()
+        self._eval_enabled = False
+        self._resolved_eval_annotations = None
+        self._eval_image_filenames = None
         self._validate_config()
 
     def _load_config(self) -> Dict[str, Any]:
@@ -398,21 +391,85 @@ class ClientConfig:
         if not os.path.exists(input_path):
             raise FileNotFoundError(f"Input path does not exist: {input_path}")
 
-        # Validate that if it's a directory, it contains image files
-        if os.path.isdir(input_path):
-            image_extensions = {'.jpg', '.jpeg', '.png', '.bmp'}
-            image_files = [f for f in os.listdir(input_path)
-                          if os.path.splitext(f)[1].lower() in image_extensions]
-            if not image_files:
-                raise ValueError(f"Directory contains no image files: {input_path}")
-
         if 'directory' not in self.config['output']:
             raise ValueError("Output configuration must include 'directory'")
+
+        eval_cfg = self.config.get('evaluation')
+        self._eval_enabled = eval_cfg is not None
+        if self._eval_enabled:
+            if self.input_type != 'directory':
+                raise ValueError("Evaluation requires input.type to be 'directory' with COCO images.")
+
+            if not os.path.isdir(input_path):
+                raise ValueError("Evaluation requires input.path to be a dataset root directory.")
+
+            if isinstance(eval_cfg, dict):
+                if 'coco_annotations' in eval_cfg or 'images_dir' in eval_cfg:
+                    raise ValueError(
+                        "Evaluation no longer accepts coco_annotations/images_dir. "
+                        "Place annotations.json under input.path and remove those fields."
+                    )
+
+            ann_path = self._find_annotations_file(self.input_path)
+            if not ann_path:
+                raise ValueError(
+                    "Evaluation enabled but annotations.json not found under input.path."
+                )
+            if not os.path.exists(ann_path):
+                raise FileNotFoundError(f"COCO annotations not found: {ann_path}")
+
+            try:
+                with open(ann_path, 'r') as f:
+                    coco_data = json.load(f)
+                if not all(k in coco_data for k in ('images', 'annotations', 'categories')):
+                    raise ValueError("COCO annotations missing required keys: images/annotations/categories")
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid COCO annotations JSON: {e}") from e
+
+            image_entries = coco_data.get('images', [])
+            file_names = [img.get('file_name') for img in image_entries if img.get('file_name')]
+            if not file_names:
+                raise ValueError("COCO annotations contain no image file_name entries.")
+            self._eval_image_filenames = file_names
+            self._resolved_eval_annotations = ann_path
+        else:
+            # Validate that if it's a directory, it contains image files
+            if os.path.isdir(input_path):
+                if not self._directory_has_images(input_path):
+                    raise ValueError(f"Directory contains no image files: {input_path}")
+
+    def _find_annotations_file(self, base_dir: str) -> Optional[str]:
+        """Search for annotations.json under base_dir."""
+        matches = []
+        for root, _dirs, files in os.walk(base_dir):
+            if 'annotations.json' in files:
+                matches.append(os.path.join(root, 'annotations.json'))
+        if not matches:
+            return None
+        if len(matches) == 1:
+            return matches[0]
+        matches_sorted = sorted(matches)
+        example = ", ".join(matches_sorted[:5])
+        raise ValueError(
+            f"Multiple annotations.json files found under input.path: {example}"
+        )
+
+    def _directory_has_images(self, directory: str) -> bool:
+        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp'}
+        return any(
+            os.path.splitext(f)[1].lower() in image_extensions
+            for f in os.listdir(directory)
+        )
 
     @property
     def input_path(self) -> str:
         """Get input path (video or image)."""
         return self.config['input']['path']
+
+    @property
+    def eval_image_filenames(self) -> Optional[List[str]]:
+        """Image filenames from COCO annotations (if evaluation enabled)."""
+        return self._eval_image_filenames
 
     @property
     def input_type(self) -> str:
@@ -441,20 +498,9 @@ class ClientConfig:
         return self.config['output']['directory']
 
     @property
-    def save_annotated_video(self) -> bool:
-        """Whether to save annotated video/image."""
+    def save_annotated(self) -> bool:
+        """Whether to save annotated outputs (video/image/frames)."""
         return self.config['output'].get('save_annotated', True)
-
-    @property
-    def save_annotated_frames(self) -> bool:
-        """Whether to save individual annotated frames."""
-        return self.config['output'].get('save_annotated_frames', True)
-
-    @property
-    def annotated_frames_dir(self) -> str:
-        """Get directory for annotated frames."""
-        frames_dir = self.config['output'].get('annotated_frames_dir', 'annotated_frames')
-        return os.path.join(self.output_directory, frames_dir)
 
     @property
     def save_results_json(self) -> bool:
@@ -490,6 +536,46 @@ class ClientConfig:
     def server_url(self) -> str:
         """Get server URL for client requests."""
         return self.config.get('client', {}).get('server_url', 'http://localhost:12182/yolo_world')
+
+    @property
+    def eval_coco_annotations(self) -> Optional[str]:
+        """Resolved COCO annotations JSON path."""
+        return self._resolved_eval_annotations
+
+    @property
+    def eval_iou_thresholds(self) -> List[float]:
+        """IoU thresholds for per-image metrics."""
+        if not self._eval_enabled:
+            return [0.5]
+        return self.config.get('evaluation', {}).get('iou_thresholds', [0.5])
+
+    @property
+    def eval_min_score(self) -> Optional[float]:
+        """Minimum score for per-image metrics (None means no filtering)."""
+        if not self._eval_enabled:
+            return None
+        return self.config.get('evaluation', {}).get('min_score')
+
+    @property
+    def eval_output_filename(self) -> str:
+        """Output filename for evaluation results."""
+        if not self._eval_enabled:
+            return 'evaluation.json'
+        return self.config.get('evaluation', {}).get('output_filename', 'evaluation.json')
+
+    @property
+    def eval_per_image_metrics(self) -> bool:
+        """Whether to compute per-image metrics for evaluation."""
+        if not self._eval_enabled:
+            return True
+        return self.config.get('evaluation', {}).get('per_image_metrics', True)
+
+    @property
+    def eval_coco_verbose(self) -> bool:
+        """Whether to print COCOeval verbose output."""
+        if not self._eval_enabled:
+            return True
+        return self.config.get('evaluation', {}).get('coco_verbose', True)
 
     @property
     def config_file(self) -> Optional[str]:
@@ -531,10 +617,20 @@ class ClientConfig:
             "",
             "Output:",
             f"  Directory: {self.output_directory}",
-            f"  Save annotated: {self.save_annotated_video}",
+            f"  Save annotated: {self.save_annotated}",
             f"  Save JSON: {self.save_results_json}",
             "",
             "Client:",
             f"  Server URL: {self.server_url}",
         ]
+        if self._eval_enabled:
+            lines.extend([
+                "",
+                "Evaluation:",
+                f"  COCO annotations: {self.eval_coco_annotations}",
+                f"  Dataset root: {self.input_path}",
+                f"  IoU thresholds: {self.eval_iou_thresholds}",
+                f"  Min score: {self.eval_min_score}",
+                f"  Per-image metrics: {self.eval_per_image_metrics}",
+            ])
         return "\n".join(lines)

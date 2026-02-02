@@ -37,7 +37,7 @@ python -m inference --config configs/inference/coco_classes.yaml
 
 **Start API Server:**
 ```bash
-python server.py --yaml-config configs/inference/yolo_world_v2_x_inference.yaml
+python server.py --yaml-config configs/inference/client_server/server.yaml
 ```
 
 ---
@@ -86,15 +86,19 @@ python -m inference --config configs/inference/coco_classes.yaml
 **Config Example** (`configs/inference/your_config.yaml`):
 ```yaml
 model:
-  config: "configs/pretrain/yolo_world_v2_l.py"
+  config_file: "configs/pretrain/yolo_world_v2_l.py"
   checkpoint: "weights/yolo_world_v2_l_stage1.pth"
-
-detection:
   text_prompts: ["person", "car", "dog", "cat"]
   confidence_threshold: 0.05
 
+input:
+  path: "/path/to/image_or_video_or_dir"
+  # type: "video"
+
 output:
+  directory: "inference_results/"
   save_annotated: true
+  save_json: true
 ```
 
 **Output:**
@@ -105,7 +109,7 @@ output:
 
 **Start Server (YAML Config - Recommended):**
 ```bash
-python server.py --yaml-config configs/inference/yolo_world_v2_x_inference.yaml
+python server.py --yaml-config configs/inference/client_server/server.yaml
 ```
 
 **Start Server (Command-line):**
@@ -142,6 +146,48 @@ print(f"Found {response.json()['num_detections']} objects")
 - `--config` + `--checkpoint` + `--prompts`: Manual configuration
 - `--port`: Port number (default: 12182)
 - `--device`, `--confidence`, `--nms`: Override defaults
+
+**Client (YAML Config):**
+```bash
+python client.py --config configs/inference/client_server/client.yaml
+```
+
+**Client (override prompts via CLI):**
+```bash
+python client.py --config configs/inference/client_server/client.yaml --prompts "person,car,dog,cat"
+```
+
+### Client-Server Evaluation (COCO)
+
+Run the server and client together, and enable COCO evaluation from the client config.
+
+**1) Start the server (use the client-server server config):**
+```bash
+python server.py --yaml-config configs/inference/client_server/server.yaml
+```
+
+**2) Configure the client:**
+Edit `configs/inference/client_server/client.yaml`:
+- `input.path`: COCO dataset root (directory)
+- `evaluation`: enable the block; `annotations.json` must live under `input.path`
+
+**3) Run the client (evaluation is triggered by the `evaluation` block):**
+```bash
+python client.py --config configs/inference/client_server/client.yaml
+```
+
+**Optional (override prompts from CLI):**
+```bash
+python client.py --config configs/inference/client_server/client.yaml --prompts "person,car,dog"
+```
+
+**Outputs:**
+- `results.json` (detections)
+- `evaluation.json` (COCOEval metrics + per-image PR/F1/IoU)
+- concise evaluation summary printed in the terminal
+
+**Note for evaluation quality:**
+For accurate AP/AR, set a low server `confidence_threshold` in the server config so the full score distribution is evaluated.
 
 ---
 
