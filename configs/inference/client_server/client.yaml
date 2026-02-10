@@ -1,5 +1,5 @@
 input:
-  path: "/path/to/directory/with/annotations"
+  path: "/path/to/annotations"
   type: "directory"
 
 output:
@@ -16,6 +16,7 @@ visualization:
 
 client:
   server_url: http://localhost:12182/yolo_world
+  batch_size: 8  # Number of images per batch request (default: 8, range: 1-100)
 
 evaluation:
   # Enable evaluation by defining this block.
