@@ -32,16 +32,33 @@ class YOLOWorldServer(YOLOWorld):
 
     def process_payload(self, payload: dict) -> dict:
         """
-        Process incoming prediction request.
+        Process incoming prediction request (single image or batch).
 
         Args:
-            payload: Dictionary containing:
-                - image: Base64 encoded image string
-                - caption: Optional string or list of class names to detect
+            payload: Dictionary containing either:
+                Single image mode:
+                    - image: Base64 encoded image string
+                    - caption: Optional string or list of class names to detect
+                Batch mode:
+                    - images: List of dicts with 'frame_id' and 'image' (base64 encoded)
+                    - caption: Optional string or list of class names to detect (shared across batch)
 
         Returns:
-            Dictionary containing detection results
+            Dictionary containing detection results:
+                Single image: {frame_id, frame_width, frame_height, detections, ...}
+                Batch: {results: [{frame_id, ...}, {frame_id, ...}, ...]}
         """
+        # Detect if this is a batch request or single image request
+        if "images" in payload:
+            # Batch processing mode
+            return self._process_batch(payload)
+        else:
+            # Single image processing mode (backward compatible)
+            return self._process_single(payload)
+
+    def _process_single(self, payload: dict) -> dict:
+        """Process single image request."""
+        print("Processing single image")
         img_np = self.str_to_image(payload["image"])
         caption = payload.get("caption", None)
 
@@ -57,3 +74,45 @@ class YOLOWorldServer(YOLOWorld):
 
         predictions = self.predict(image=img_np, prompts=prompts)
         return predictions.to_dict()
+
+    def _process_batch(self, payload: dict) -> dict:
+        """Process batch request."""
+        images_data = payload.get("images", [])
+        caption = payload.get("caption", None)
+
+        print(f"Processing batch of {len(images_data)} images")
+
+        # Parse prompts once (shared across all images in batch)
+        if caption is not None:
+            if isinstance(caption, str):
+                prompts = [[c.strip()] for c in caption.rstrip(" .").split(" . ")] + [[' ']]
+            elif isinstance(caption, list):
+                prompts = [[c.strip()] for c in caption] + [[' ']]
+            else:
+                prompts = None
+        else:
+            prompts = None
+
+        # Process each image in the batch
+        results = []
+        for img_data in images_data:
+            frame_id = img_data.get("frame_id", 0)
+            img_str = img_data.get("image")
+
+            try:
+                img_np = self.str_to_image(img_str)
+                predictions = self.predict(image=img_np, prompts=prompts, frame_id=frame_id)
+                results.append(predictions.to_dict())
+            except Exception as e:
+                # Log error and return empty result for this frame
+                print(f"Error processing frame {frame_id}: {e}")
+                results.append({
+                    "frame_id": frame_id,
+                    "frame_width": 0,
+                    "frame_height": 0,
+                    "num_detections": 0,
+                    "detections": [],
+                    "error": str(e)
+                })
+
+        return {"results": results}

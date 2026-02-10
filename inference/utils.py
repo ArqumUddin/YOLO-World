@@ -234,7 +234,6 @@ def prepare_inference_input(config) -> InferenceInput:
         load_time=load_time
     )
 
-
 def encode_frame(frame_rgb: np.ndarray) -> str:
     """
     Encode RGB frame to base64 JPEG string.
@@ -257,36 +256,44 @@ def encode_frame(frame_rgb: np.ndarray) -> str:
     img_base64 = base64.b64encode(buffer).decode('utf-8')
     return img_base64
 
-
-def send_frame_to_server(
-    frame_rgb: np.ndarray,
+def send_batch_to_server(
+    frames_with_ids: List[Tuple[int, np.ndarray]],
     server_url: str,
     text_prompts: List[str] = None,
-    timeout: int = 30
-) -> Dict[str, Any]:
+    timeout: int = 120
+) -> List[Dict[str, Any]]:
     """
-    Send a frame to the YOLO-World server for inference.
+    Send a batch of frames to the YOLO-World server for inference.
 
     Args:
-        frame_rgb: RGB image as numpy array
+        frames_with_ids: List of (frame_id, frame_rgb) tuples
         server_url: Server endpoint URL
-        text_prompts: Optional list of class names to detect
-        timeout: Request timeout in seconds
+        text_prompts: Optional list of class names to detect (shared across batch)
+        timeout: Request timeout in seconds (default 120 for batch processing)
 
     Returns:
-        Detection results dictionary
+        List of detection result dictionaries
     """
-    # Encode frame
-    img_base64 = encode_frame(frame_rgb)
+    # Encode all frames
+    images_data = []
+    for frame_id, frame_rgb in frames_with_ids:
+        img_base64 = encode_frame(frame_rgb)
+        images_data.append({
+            "frame_id": frame_id,
+            "image": img_base64
+        })
 
-    # Prepare payload
-    payload = {"image": img_base64}
+    # Prepare batch payload
+    payload = {"images": images_data}
 
     # Add text prompts if provided
     if text_prompts is not None:
         payload["caption"] = text_prompts
 
-    # Send request
+    # Debug: print batch info (optional - can be removed)
+    # print(f"Sending batch of {len(images_data)} images to server")
+
+    # Send batch request to main endpoint
     try:
         response = requests.post(
             server_url,
@@ -295,10 +302,10 @@ def send_frame_to_server(
             headers={"Content-Type": "application/json"}
         )
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+        return result.get("results", [])
     except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"Server request failed: {e}")
-
+        raise RuntimeError(f"Batch server request failed: {e}")
 
 def dict_to_frame_detections(result_dict: Dict[str, Any], frame_id: int) -> FrameDetections:
     """

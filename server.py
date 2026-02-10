@@ -133,10 +133,15 @@ Examples:
     print(f"✓ Model loaded successfully!")
     print(f"✓ Server ready! Listening on http://0.0.0.0:{port}/yolo_world")
     print("=" * 80)
-    print("\nExample request:")
+    print("\nExample requests:")
+    print("\n  Single image:")
     print(f"  curl -X POST http://localhost:{port}/yolo_world \\")
     print('    -H "Content-Type: application/json" \\')
     print('    -d \'{"image": "<base64_encoded_image>", "caption": "person . car . dog ."}\'')
+    print("\n  Batch (multiple images):")
+    print(f"  curl -X POST http://localhost:{port}/yolo_world \\")
+    print('    -H "Content-Type: application/json" \\')
+    print('    -d \'{"images": [{"frame_id": 0, "image": "<base64_1>"}, {"frame_id": 1, "image": "<base64_2>"}], "caption": "person . car . dog ."}\'')
     print("=" * 80 + "\n")
 
     # Start server

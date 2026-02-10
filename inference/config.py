@@ -538,6 +538,15 @@ class ClientConfig:
         return self.config.get('client', {}).get('server_url', 'http://localhost:12182/yolo_world')
 
     @property
+    def batch_size(self) -> int:
+        """Get batch size for client requests."""
+        batch_size = self.config.get('client', {}).get('batch_size', 8)
+        # Validate batch size
+        if not isinstance(batch_size, int) or batch_size < 1 or batch_size > 100:
+            raise ValueError(f"batch_size must be an integer between 1 and 100, got: {batch_size}")
+        return batch_size
+
+    @property
     def eval_coco_annotations(self) -> Optional[str]:
         """Resolved COCO annotations JSON path."""
         return self._resolved_eval_annotations

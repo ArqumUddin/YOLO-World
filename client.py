@@ -23,7 +23,7 @@ from inference.evaluation import COCOEvaluator
 from inference.utils import (
     prepare_inference_input,
     save_inference_results,
-    send_frame_to_server,
+    send_batch_to_server,
     dict_to_frame_detections
 )
 
@@ -58,31 +58,44 @@ def run_client_inference(config: ClientConfig, server_url: str, text_prompts: Li
         print(f"  Expected at: {server_url}")
         sys.exit(1)
 
-    # Process frames
+    # Process frames (with batch processing)
     print("\nSending frames to server for inference...")
     start_inference = time.time()
 
     all_detections = []
 
-    for frame_id, frame in enumerate(tqdm(input_data.frames, desc="Processing frames")):
+    # Get batch size from config (default to 8 if not specified)
+    batch_size = getattr(config, 'batch_size', 8)
+    print(f"Using batch size: {batch_size}")
+
+    # Process frames in batches
+    total_frames = len(input_data.frames)
+    num_batches = (total_frames + batch_size - 1) // batch_size
+
+    for batch_idx in tqdm(range(0, total_frames, batch_size), desc="Processing batches", total=num_batches):
+        batch_end = min(batch_idx + batch_size, total_frames)
+        batch_frames = [(i, input_data.frames[i]) for i in range(batch_idx, batch_end)]
+
         try:
-            result_dict = send_frame_to_server(
-                frame,
-                server_url,
-                text_prompts=prompts_to_use
-            )
-            frame_detections = dict_to_frame_detections(result_dict, frame_id)
-            all_detections.append(frame_detections)
+            # Send batch to server
+            results = send_batch_to_server(batch_frames, server_url, text_prompts=prompts_to_use)
+
+            # Parse each result
+            for result_dict in results:
+                frame_detections = dict_to_frame_detections(result_dict, result_dict.get('frame_id', 0))
+                all_detections.append(frame_detections)
+
         except Exception as e:
-            print(f"\nError processing frame {frame_id}: {e}")
-            # Create empty detection for this frame
-            frame_detections = FrameDetections(
-                frame_id=frame_id,
-                detections=[],
-                frame_width=frame.shape[1],
-                frame_height=frame.shape[0]
-            )
-            all_detections.append(frame_detections)
+            print(f"\nError processing batch {batch_idx // batch_size + 1}: {e}")
+            # Create empty detections for failed batch
+            for frame_id, frame in batch_frames:
+                frame_detections = FrameDetections(
+                    frame_id=frame_id,
+                    detections=[],
+                    frame_width=frame.shape[1],
+                    frame_height=frame.shape[0]
+                )
+                all_detections.append(frame_detections)
 
     inference_time = time.time() - start_inference
 
