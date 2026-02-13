@@ -37,15 +37,11 @@ pip install mmcv==2.0.0 -f https://download.openmmlab.com/mmcv/dist/cu118/torch2
 echo "Setting up third_party/mmyolo..."
 mkdir -p third_party
 if [ -d "third_party/mmyolo" ]; then
-    echo "mmyolo exists. Update? (y/n)"
-    read -r reply
-    if [[ $reply =~ ^[Yy]$ ]]; then
-        rm -rf third_party/mmyolo
-        git clone --depth 1 --filter=blob:none --sparse https://github.com/open-mmlab/mmyolo.git third_party/mmyolo
-        cd third_party/mmyolo
-        git sparse-checkout set configs
-        cd "$SCRIPT_DIR"
-    fi
+    rm -rf third_party/mmyolo
+    git clone --depth 1 --filter=blob:none --sparse https://github.com/open-mmlab/mmyolo.git third_party/mmyolo
+    cd third_party/mmyolo
+    git sparse-checkout set configs
+    cd "$SCRIPT_DIR"
 else
     git clone --depth 1 --filter=blob:none --sparse https://github.com/open-mmlab/mmyolo.git third_party/mmyolo
     cd third_party/mmyolo
