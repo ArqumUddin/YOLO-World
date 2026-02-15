@@ -124,6 +124,9 @@ work_dirs
 *.py~
 *.sh~
 
+# Allow specific .npy files for DINO Real Reference
+!DINO_test/sel_feats/real_ref/*.npy
+
 # Large files and dependencies
 weights/
 third_party/
