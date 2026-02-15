@@ -1,0 +1,19 @@
+input:
+  path: "DINO_test/small_eval"
+  type: "directory"
+
+output:
+  directory: "inference_results/"
+  save_annotated: true
+  save_json: true
+  results_filename: "results.json"
+
+visualization:
+  bbox_thickness: 2
+  font_scale: 0.5
+  show_confidence: true
+  show_class_name: true
+
+client:
+  server_url: http://localhost:12182/yolo_world
+  batch_size: 8

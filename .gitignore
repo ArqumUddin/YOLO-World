@@ -119,8 +119,17 @@ work_dirs
 
 # Pytorch
 *.pth
+*.pt
+*.npy
 *.py~
 *.sh~
+
+# Large files and dependencies
+weights/
+third_party/
+DINO_test/isaac_ref/
+DINO_test/small_eval/
+inference_results/
 
 # venus
 venus_run.sh

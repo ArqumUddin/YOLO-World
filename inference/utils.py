@@ -319,30 +319,43 @@ def dict_to_frame_detections(result_dict: Dict[str, Any], frame_id: int) -> Fram
         FrameDetections object
     """
     detections = []
-
-    for det_dict in result_dict.get('detections', []):
+    
+    # Process detections
+    detections_list = result_dict.get('detections', [])
+    # Handle nested detections if any
+    if isinstance(detections_list, dict):
+        # Could happen if server sends {detections: {...}} but usually it's list
+        pass
+        
+    for det_dict in detections_list:
         bbox_dict = det_dict['bbox']
         bbox = BoundingBox(
-            x_min=bbox_dict['x_min'],
-            y_min=bbox_dict['y_min'],
-            x_max=bbox_dict['x_max'],
-            y_max=bbox_dict['y_max']
+            x_min=float(bbox_dict['x_min']),
+            y_min=float(bbox_dict['y_min']),
+            x_max=float(bbox_dict['x_max']),
+            y_max=float(bbox_dict['y_max'])
         )
 
         detection = Detection(
             bbox=bbox,
             class_name=det_dict['class_name'],
-            confidence=det_dict['confidence'],
-            class_id=det_dict.get('class_id')
+            confidence=float(det_dict['confidence']),
+            class_id=int(det_dict['class_id']) if det_dict.get('class_id') is not None else None
         )
         detections.append(detection)
 
-    return FrameDetections(
+    fd = FrameDetections(
         frame_id=frame_id,
         detections=detections,
         frame_width=result_dict.get('frame_width'),
         frame_height=result_dict.get('frame_height')
     )
+    
+    # Attach metrics if present
+    if 'metrics' in result_dict:
+        fd.metrics = result_dict['metrics']
+        
+    return fd
 
 
 def get_unique_output_directory(base_directory: str, name: str) -> str:

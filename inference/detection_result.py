@@ -80,16 +80,20 @@ class FrameDetections:
     detections: List[Detection] = field(default_factory=list)
     frame_width: Optional[int] = None
     frame_height: Optional[int] = None
+    metrics: Optional[dict] = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
-        return {
+        d = {
             'frame_id': self.frame_id,
             'frame_width': self.frame_width,
             'frame_height': self.frame_height,
             'num_detections': len(self.detections),
             'detections': [det.to_dict() for det in self.detections]
         }
+        if self.metrics:
+            d['metrics'] = self.metrics
+        return d
 
     def get_detection_counts(self) -> dict:
         """Get count of detections per class."""
