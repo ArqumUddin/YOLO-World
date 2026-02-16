@@ -1,4 +1,4 @@
-name: yolo-world-eval
+name: yolo-world
 channels:
   - defaults
   - nvidia
@@ -14,29 +14,29 @@ dependencies:
   - cuda-nvrtc=11.8.89
   - cuda-nvtx=11.8.86
   - cuda-runtime=11.8.0
-  - cuda-version=13.0
+  - cuda-version=
   - expat=2.7.3
   - ld_impl_linux-64=2.44
-  - libcublas=11.11.3.6
-  - libcufft=10.9.0.58
-  - libcufile=1.15.1.6
-  - libcurand=10.4.0.35
-  - libcusolver=11.4.1.48
-  - libcusparse=11.7.5.86
-  - libexpat=2.7.3
-  - libffi=3.4.4
-  - libgcc=15.2.0
-  - libgcc-ng=15.2.0
-  - libgomp=15.2.0
-  - libnl=3.11.0
-  - libnpp=11.8.0.86
-  - libnsl=2.0.0
-  - libnvjpeg=11.9.0.86
-  - libstdcxx=15.2.0
-  - libstdcxx-ng=15.2.0
-  - libuuid=1.41.5
-  - libxcb=1.17.0
-  - libzlib=1.3.1
+  - libcublas
+  - libcufft
+  - libcufile
+  - libcurand
+  - libcusolver
+  - libcusparse
+  - libexpat
+  - libffi
+  - libgcc=
+  - libgcc-ng
+  - libgomp
+  - libnl
+  - libnpp
+  - libnsl
+  - libnvjpeg
+  - libstdcxx
+  - libstdcxx-ng
+  - libuuid
+  - libxcb
+  - libzlib
   - ncurses=6.5
   - openssl=3.0.18
   - pthread-stubs=0.3
@@ -59,7 +59,7 @@ dependencies:
       - certifi==2022.12.7
       - charset-normalizer==2.1.1
       - click==8.3.1
-      - clip==1.0
+      - clip
       - cmake==3.25.0
       - contourpy==1.3.2
       - cycler==0.12.1
