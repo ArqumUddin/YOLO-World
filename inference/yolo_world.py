@@ -64,7 +64,14 @@ class YOLOWorld:
         print(f"Device: {self.device}")
         print(f"Text prompts ({len(text_prompts)} classes): {text_prompts}")
 
-        # Load config
+        # Load config — if a YAML wrapper is passed, resolve the inner .py config
+        if config_path.endswith(('.yaml', '.yml')):
+            import yaml as _yaml
+            with open(config_path) as f:
+                wrapper = _yaml.safe_load(f)
+            config_path = wrapper['model']['config_file']
+            self.config_path = config_path
+
         self.cfg = Config.fromfile(config_path)
         self.cfg.work_dir = './work_dirs'
         self.cfg.load_from = checkpoint_path
