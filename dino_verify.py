@@ -93,92 +93,68 @@ class DinoFeatureVerifier:
         # feature_map shape: (1, h_grid, w_grid, 1024)
         roi_features = feature_map_data['feature_map'][0, gy1:gy2, gx1:gx2, :]
         
-        # Pooling: Average the patch tokens within the bbox
+        # Reshape roi features to (B, f)
         if roi_features.numel() == 0:
             # Fallback to single center point if bbox is too small
             cx, cy = (gx1 + gx2) // 2, (gy1 + gy2) // 2
-            embedding = feature_map_data['feature_map'][0, cy, cx, :]
+            embedding = feature_map_data['feature_map'][0, cy, cx, :].unsqueeze(0)  # (1, f)
         else:
-            embedding = roi_features.mean(dim=(0, 1))
-            
-        # Normalize
-        embedding = embedding / embedding.norm()
+            B = roi_features.shape[0] * roi_features.shape[1]
+            embedding = roi_features.reshape(B, -1)  # (B, f)
+
+        # Normalize each row
+        embedding = embedding / (embedding.norm(dim=1, keepdim=True) + 1e-8)
         
         current_yolo_label = yolo_result['label']
         result_label = current_yolo_label
         corrected = False
         action = 'verified_kept'
 
-        # Global Adaptive Average Mode Only
-        # 1. Compare against ALL labels' individual features.
-        # 2. For each label, average the similarity scores of ONLY the features that have sim > ADAPTIVE_AVG_THRESHOLD (0.3).
-        # 3. If no features > 0.3 for a label, score is 0.0.
-        # 4. Use the best score to decide (Keep/Correct/Discard).
-        
-        label_scores = []
-        
-        for label, feats in prototypes.items():
-            # feats: (N, 1024), embedding: (1024,)
-            sims = torch.mv(feats, embedding)
-            
-            # Mask for features > threshold
-            good_mask = sims > ADAPTIVE_AVG_THRESHOLD
-            good_sims = sims[good_mask]
-            
-            if good_sims.numel() > 0:
-                score = good_sims.mean().item()
-                # Secondary tie-breaker: max similarity found for this label
-                max_sim_tiebreaker = good_sims.max().item() 
-            else:
-                score = 0.0
-                max_sim_tiebreaker = 0.0
+        # Scoring: single matmul over all labels, then split by label to take max.
+        # embedding: (B, f), all_feats: (N_total, f) -> all_sims: (B, N_total)
+        labels = list(prototypes.keys())
+        feat_list = [prototypes[l] for l in labels]
+        all_feats = torch.cat(feat_list, dim=0)          # (N_total, f)
+        all_sims = embedding @ all_feats.T               # (B, N_total)
 
-            label_scores.append({
-                'label': label,
-                'score': score,
-                'max_sim': max_sim_tiebreaker
-            })
+        label_scores = []
+        offset = 0
+        for label, feats in zip(labels, feat_list):
+            n = feats.shape[0]
+            score = all_sims[:, offset:offset + n].max().item()
+            label_scores.append({'label': label, 'score': score})
+            offset += n
         
         # Find best score
-        if not label_scores:
-            best_score = 0.0
-            winners = []
-        else:
-            # Sort descending by score, then by max_sim
-            label_scores.sort(key=lambda x: (x['score'], x['max_sim']), reverse=True)
-            best_score = label_scores[0]['score']
-            
-            # Use top 3 labels
-            top3_labels_scores = label_scores[:3]
-            
-            # Check for winners (allow ties) - still useful for logging, but not strictly "winners" in top 3 logic
-            winners = [x for x in label_scores if x['score'] == best_score]
+        label_scores.sort(key=lambda x: x['score'], reverse=True)
+        best_score = label_scores[0]['score']
+        
+        # Use top 3 labels
+        top3_labels_scores = label_scores[:3]
+        
+        # Check for winners (allow ties) - still useful for logging, but not strictly "winners" in top 3 logic
+        winners = [x for x in label_scores if x['score'] == best_score]
         
         best_sim = best_score
         
-        if best_score == 0.0: # No good matches for ANY label
-            result_label = None
-            corrected = False
-            action = 'discarded_no_adaptive_matches'
+        # Check if YOLO label is among the Top 3
+        top3_labels = [w['label'] for w in top3_labels_scores]
+        
+        if current_yolo_label in top3_labels:
+            # Verified (YOLO is in top 3)
+            pass
         else:
-             # Check if YOLO label is among the Top 3
-             top3_labels = [w['label'] for w in top3_labels_scores]
-             
-             if current_yolo_label in top3_labels:
-                 # Verified (YOLO is in top 3)
-                 pass
-             else:
-                 # YOLO label is not in Top 3
-                 if self.correction_enabled:
-                     best_winner = winners[0]['label']
-                     result_label = best_winner
-                     corrected = True
-                     action = 'corrected_global_adaptive_top3'
-                 else:
-                     # Correction disabled -> Discard detection because YOLO label wasn't in top 3
-                     result_label = None
-                     corrected = False
-                     action = 'discarded_correction_disabled_global_adaptive_top3'
+            # YOLO label is not in Top 3
+            if self.correction_enabled:
+                best_winner = winners[0]['label']
+                result_label = best_winner
+                corrected = True
+                action = 'corrected_global_adaptive_top3'
+            else:
+                # Correction disabled -> Discard detection because YOLO label wasn't in top 3
+                result_label = None
+                corrected = False
+                action = 'discarded_correction_disabled_global_adaptive_top3'
             
         return {
             'final_label': result_label,
