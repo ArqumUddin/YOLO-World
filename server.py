@@ -563,7 +563,7 @@ if __name__ == "__main__":
     # Cleaned flags: Verification is now always enabled with fixed strategy (global_adaptive_avg, no correction)
     parser.add_argument("--benchmark", action="store_true", help="Run local benchmark instead of starting server")
     parser.add_argument("--enable-metrics", action="store_true", help="Enable detailed latency metrics in server logs")
-    
+
     args = parser.parse_args()
 
     # Parse prompts
