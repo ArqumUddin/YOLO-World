@@ -80,7 +80,6 @@ dependencies:
       - markupsafe==2.1.5
       - matplotlib==3.8.2
       - mdurl==0.1.2
-      - mmcv==2.0.0
       - mmdet==3.0.0
       - mmengine==0.10.7
       - mmyolo==0.6.0
