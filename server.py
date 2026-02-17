@@ -400,13 +400,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="YOLO-World + DINO Server")
     
     parser.add_argument("--port", type=int, default=12182, help="Port to run the server on")
-    parser.add_argument("--config", type=str, default=YOLO_CONFIG_PATH, help="Path to model config")
+    parser.add_argument("--yaml-config", type=str, default=YOLO_CONFIG_PATH, help="Path to model config")
     parser.add_argument("--checkpoint", type=str, default=YOLO_WEIGHTS_PATH, help="Path to checkpoint")
     parser.add_argument("--prompts", type=str, default=",".join(TARGET_LABELS), help="Comma-separated initial prompts")
     parser.add_argument("--no-verify", action="store_true", help="Disable DINO verification (YOLO only mode)")
     parser.add_argument("--benchmark", action="store_true", help="Run local benchmark instead of starting server")
     parser.add_argument("--enable-metrics", action="store_true", help="Enable detailed latency metrics in server logs")
-    
+
     args = parser.parse_args()
 
     # Parse prompts
@@ -418,7 +418,7 @@ if __name__ == "__main__":
     # Initialize Server
     print("Initializing Model...")
     server = DinoYoloWorldServer(
-        config_path=args.config,
+        config_path=args.yaml_config,
         checkpoint_path=args.checkpoint,
         text_prompts=initial_prompts,
         port=args.port,
