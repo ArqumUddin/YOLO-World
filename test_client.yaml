@@ -1,5 +1,5 @@
 input:
-  path: "DINO_test/small_eval"
+  path: "/home/ubuntu/workspace/Tiamat/YOLO-World-DINO/DINO_test/dt_scene_based_sdg_data_path_0005"
   type: "directory"
 
 output:
@@ -16,4 +16,9 @@ visualization:
 
 client:
   server_url: http://localhost:12182/yolo_world
-  batch_size: 8
+  batch_size: 4
+
+evaluation:
+  iou_thresholds: [0.5, 0.75]
+  save_json: true
+

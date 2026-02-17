@@ -4,17 +4,25 @@ import numpy as np
 # --- TUNABLE PARAMETERS ---
 # Verify ONLY if YOLO confidence is below this score.
 # If confidence is high (>= 0.8), we trust YOLO and skip verification.
-CONFIDENCE_THRESHOLD = 0.8  
+CONFIDENCE_THRESHOLD = 0.8
 
-# Verify ONLY if YOLO predicts one of our "seen" labels (prototypes).
 # Labels not in prototypes are skipped.
 # (Logic handled inside verify function by checking prototypes keys)
 
-# Correct the prediction ONLY if the best similarity score is above this threshold.
-CORRECTION_THRESHOLD = 0.5 
+# Threshold for 'global_adaptive_avg' mode (features > this score are averaged)
+ADAPTIVE_AVG_THRESHOLD = 0.3
 # --------------------------
 
 class DinoFeatureVerifier:
+    def __init__(self, correction_enabled: bool = False, verification_mode: str = "global_adaptive_avg"):
+        """
+        Args:
+            correction_enabled: Whether to allow correcting labels to better matches. (Hardcoded False in usage)
+            verification_mode: Verification strategy. (Hardcoded global_adaptive_avg in usage)
+        """
+        self.correction_enabled = correction_enabled
+        self.verification_mode = verification_mode
+
     def verify(self, feature_map_data, yolo_result, prototypes):
         """
         RUNS AFTER YOLO results are in (O(1) lookups).
@@ -96,31 +104,81 @@ class DinoFeatureVerifier:
         # Normalize
         embedding = embedding / embedding.norm()
         
-        # Similarity Comparison (O(K) where K=Number of Prototypes)
-        best_sim = -1.0
-        best_label = None
-        
         current_yolo_label = yolo_result['label']
-        
-        # We check against ALL prototypes to find the best match amongst seen labels
-        for label, proto in prototypes.items():
-            sim = torch.dot(embedding, proto).item()
-            if sim > best_sim:
-                best_sim = sim
-                best_label = label
-                
-        # Correction Logic
         result_label = current_yolo_label
         corrected = False
         action = 'verified_kept'
+
+        # Global Adaptive Average Mode Only
+        # 1. Compare against ALL labels' individual features.
+        # 2. For each label, average the similarity scores of ONLY the features that have sim > ADAPTIVE_AVG_THRESHOLD (0.3).
+        # 3. If no features > 0.3 for a label, score is 0.0.
+        # 4. Use the best score to decide (Keep/Correct/Discard).
         
-        if best_sim > CORRECTION_THRESHOLD:
-            if best_label is not None and best_label != current_yolo_label:
-                result_label = best_label
-                corrected = True
-                action = 'corrected'
+        label_scores = []
+        
+        for label, feats in prototypes.items():
+            # feats: (N, 1024), embedding: (1024,)
+            sims = torch.mv(feats, embedding)
+            
+            # Mask for features > threshold
+            good_mask = sims > ADAPTIVE_AVG_THRESHOLD
+            good_sims = sims[good_mask]
+            
+            if good_sims.numel() > 0:
+                score = good_sims.mean().item()
+                # Secondary tie-breaker: max similarity found for this label
+                max_sim_tiebreaker = good_sims.max().item() 
+            else:
+                score = 0.0
+                max_sim_tiebreaker = 0.0
+
+            label_scores.append({
+                'label': label,
+                'score': score,
+                'max_sim': max_sim_tiebreaker
+            })
+        
+        # Find best score
+        if not label_scores:
+            best_score = 0.0
+            winners = []
         else:
-             action = 'low_similarity_kept'
+            # Sort descending by score, then by max_sim
+            label_scores.sort(key=lambda x: (x['score'], x['max_sim']), reverse=True)
+            best_score = label_scores[0]['score']
+            
+            # Use top 3 labels
+            top3_labels_scores = label_scores[:3]
+            
+            # Check for winners (allow ties) - still useful for logging, but not strictly "winners" in top 3 logic
+            winners = [x for x in label_scores if x['score'] == best_score]
+        
+        best_sim = best_score
+        
+        if best_score == 0.0: # No good matches for ANY label
+            result_label = None
+            corrected = False
+            action = 'discarded_no_adaptive_matches'
+        else:
+             # Check if YOLO label is among the Top 3
+             top3_labels = [w['label'] for w in top3_labels_scores]
+             
+             if current_yolo_label in top3_labels:
+                 # Verified (YOLO is in top 3)
+                 pass
+             else:
+                 # YOLO label is not in Top 3
+                 if self.correction_enabled:
+                     best_winner = winners[0]['label']
+                     result_label = best_winner
+                     corrected = True
+                     action = 'corrected_global_adaptive_top3'
+                 else:
+                     # Correction disabled -> Discard detection because YOLO label wasn't in top 3
+                     result_label = None
+                     corrected = False
+                     action = 'discarded_correction_disabled_global_adaptive_top3'
             
         return {
             'final_label': result_label,

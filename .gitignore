@@ -127,16 +127,28 @@ work_dirs
 # Allow specific .npy files for DINO Real Reference
 !DINO_test/sel_feats/real_ref/*.npy
 
+# Ignore subdirectories in real_ref (which contain the source images/features)
+DINO_test/sel_feats/real_ref/*/
+
 # Large files and dependencies
 weights/
 third_party/
 DINO_test/isaac_ref/
 DINO_test/small_eval/
 inference_results/
-
+DINO_test/dt_scene_based_sdg_data_path_0005
+DINO_test/real_ref
 # venus
 venus_run.sh
 
 results/
 
 inference_results/
+
+DINO_test/camping_labels.json
+
+DINO_test/potential_categories.json
+
+DINO_test/YOLO DINO report.pdf
+
+tools/fix_annotations.py
