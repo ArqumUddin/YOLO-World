@@ -14,7 +14,7 @@ dependencies:
   - cuda-nvrtc=11.8.89
   - cuda-nvtx=11.8.86
   - cuda-runtime=11.8.0
-  - cuda-version=
+  - cuda-version
   - expat=2.7.3
   - ld_impl_linux-64=2.44
   - libcublas
@@ -25,7 +25,7 @@ dependencies:
   - libcusparse
   - libexpat
   - libffi
-  - libgcc=
+  - libgcc
   - libgcc-ng
   - libgomp
   - libnl

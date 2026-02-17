@@ -172,6 +172,134 @@ class YOLOWorld:
 
         return frame_detections
 
+    def predict_batch(
+        self,
+        images: List[np.ndarray],
+        prompts: List[str] = None,
+        start_frame_id: int = 0
+    ) -> List[FrameDetections]:
+        """
+        Run inference on a batch of frames in parallel (Tensor Batching).
+        """
+        if not images:
+            return []
+
+        if prompts is None:
+            prompts = self.texts
+
+        # Preprocess all images
+        batch_inputs = []
+        batch_data_samples = []
+        
+        # 1. Preprocessing Loop (CPU)
+        for i, image in enumerate(images):
+            frame_id = start_frame_id + i
+            # Construct data_info for pipeline
+            data_info = dict(img=image, img_id=frame_id, texts=prompts)
+            # Run pipeline (transforms, normalization)
+            processed_data = self.test_pipeline(data_info)
+            batch_inputs.append(processed_data['inputs'])
+            batch_data_samples.append(processed_data['data_samples'])
+
+        # 2. Stack inputs to (B, C, H, W)
+        try:
+            # We need to ensure all tensors are stacked before passing to test_step
+            # For data_preprocessor, usually inputs is a list of tensors or a Tensor
+            # but usually for batching we try to use DataParallel or just stacked.
+            # Here we are using single GPU, so standard batching.
+            # Convert list of tensors to stacked tensor IF they are same size
+            batch_tensor = torch.stack(batch_inputs)
+            # Update data_samples structure for batch input if needed
+            # Usually mmdet expects `inputs` as a list of tensors OR Tensor(B, C, H, W)
+            # Let's try passing list first, usually safer with mmdet.
+            # But wait, `batch_inputs` is a list of tensors.
+            # data_batch = dict(inputs=batch_inputs, data_samples=batch_data_samples) 
+            
+            # Actually, `test_step` expects a dict.
+            data_batch = dict(inputs=batch_inputs, data_samples=batch_data_samples)
+
+        except Exception as e:
+            print(f"Error preparing batch: {e}. defaulting to serial.")
+            return self.predict_frames(images, start_frame_id, show_progress=False)
+        
+        # 3. Model Inference (GPU Batch)
+        with autocast(enabled=self.use_amp), torch.no_grad():
+            # model.test_step returns a list of predictions [DetDataSample, ...]
+            outputs = self.model.test_step(data_batch)
+
+        # 4. Post-processing Loop
+        all_results = []
+        for i, output in enumerate(outputs):
+            current_frame_id = start_frame_id + i
+            pred_instances = output.pred_instances
+            
+            # (Same NMS and filtering logic as predict)
+            if len(pred_instances.scores) > 0:
+                keep = nms(
+                    pred_instances.bboxes,
+                    pred_instances.scores,
+                    iou_threshold=self.nms_threshold
+                )
+                pred_instances = pred_instances[keep]
+
+            pred_instances = pred_instances[
+                pred_instances.scores.float() > self.confidence_threshold
+            ]
+
+            if len(pred_instances.scores) > self.max_detections:
+                indices = pred_instances.scores.float().topk(self.max_detections)[1]
+                pred_instances = pred_instances[indices]
+
+            pred_instances = pred_instances.cpu().numpy()
+            
+            # Extract detections
+            detections = []
+            width = images[i].shape[1]
+            height = images[i].shape[0]
+            
+            if 'bboxes' in pred_instances and len(pred_instances['bboxes']) > 0:
+                for bbox_coords, label_id, score in zip(
+                    pred_instances['bboxes'],
+                    pred_instances['labels'],
+                    pred_instances['scores']
+                ):
+                    try:
+                        # prompts structure is usually [['class1'], ['class2'], ...]
+                        # But self.texts is list of lists
+                        # prompts arg here is also list of lists if passed correctly
+                        
+                        # Check prompts structure:
+                        # The implementation of predict logic uses: class_name = prompts[int(label_id)][0]
+                        prompt_entry = prompts[int(label_id)]
+                        class_name = prompt_entry[0] if isinstance(prompt_entry, list) else prompt_entry
+                    except:
+                        class_name = str(label_id)
+
+                    bbox = BoundingBox(
+                        x_min=float(bbox_coords[0]),
+                        y_min=float(bbox_coords[1]),
+                        x_max=float(bbox_coords[2]),
+                        y_max=float(bbox_coords[3])
+                    )
+
+                    detection = Detection(
+                        bbox=bbox,
+                        class_name=class_name,
+                        confidence=float(score),
+                        class_id=int(label_id)
+                    )
+                    detections.append(detection)
+            
+            frame_detect = FrameDetections(
+                frame_id=current_frame_id,
+                detections=detections,
+                frame_width=width,
+                frame_height=height
+            )
+            all_results.append(frame_detect)
+            
+        return all_results
+
     def predict_frames(
         self,
         images: List[np.ndarray],
