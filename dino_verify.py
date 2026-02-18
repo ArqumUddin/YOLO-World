@@ -13,6 +13,8 @@ CONFIDENCE_THRESHOLD = 0.8
 ADAPTIVE_AVG_THRESHOLD = 0.3
 # --------------------------
 
+DEBUG = True
+
 class DinoFeatureVerifier:
     def __init__(self, correction_enabled: bool = False, verification_mode: str = "global_adaptive_avg"):
         """
@@ -124,6 +126,66 @@ class DinoFeatureVerifier:
             score = all_sims[:, offset:offset + n].max().item()
             label_scores.append({'label': label, 'score': score})
             offset += n
+            
+        if DEBUG:
+            import matplotlib.pyplot as plt
+            import matplotlib.patches as patches
+
+            h_grid, w_grid = feature_map_data['grid_size']
+            feature_map_debug = feature_map_data["feature_map"][0]  # (h_grid, w_grid, f)
+
+            # Normalize feature map tokens for cosine similarity
+            fm_flat = feature_map_debug.reshape(-1, feature_map_debug.shape[-1])  # (h*w, f)
+            fm_flat = fm_flat / (fm_flat.norm(dim=1, keepdim=True) + 1e-8)
+            all_sim_scores = fm_flat @ all_feats.T               # (h*w, N_total)
+
+            # Build label -> (start, end) column slice into all_sim_scores
+            label_offsets = {}
+            off = 0
+            for lbl, feats in zip(labels, feat_list):
+                label_offsets[lbl] = (off, off + feats.shape[0])
+                off += feats.shape[0]
+
+            # Print summary
+            sorted_scores = sorted(label_scores, key=lambda x: x['score'], reverse=True)
+            print(f"[DINO DEBUG] YOLO='{current_yolo_label}'  "
+                  f"bbox=[{x1:.1f},{y1:.1f},{x2:.1f},{y2:.1f}]  "
+                  f"grid=[{gx1},{gy1},{gx2},{gy2}]")
+            print("[DINO DEBUG] Label scores:")
+            for ls in sorted_scores:
+                marker = " <-- YOLO" if ls['label'] == current_yolo_label else ""
+                print(f"  {ls['label']}: {ls['score']:.4f}{marker}")
+
+            # One figure per label; cols = reference features for that label
+            for ls in sorted_scores:
+                lbl = ls['label']
+                start, end = label_offsets[lbl]
+                n_feats = end - start
+
+                fig, axes = plt.subplots(1, n_feats, figsize=(6 * n_feats, 6), squeeze=False)
+                fig.suptitle(
+                    f"{lbl}  score={ls['score']:.3f}  |  "
+                    f"YOLO='{current_yolo_label}'  "
+                    f"bbox=[{x1:.0f},{y1:.0f},{x2:.0f},{y2:.0f}]  "
+                    f"grid=[{gx1},{gy1},{gx2},{gy2}]",
+                    fontsize=10
+                )
+
+                for col in range(n_feats):
+                    ax = axes[0, col]
+                    sim_map = all_sim_scores[:, start + col].reshape(h_grid, w_grid).cpu().numpy()
+                    im = ax.imshow(sim_map, vmin=0.0, vmax=1.0, cmap='hot',
+                                   interpolation='nearest')
+                    rect = patches.Rectangle(
+                        (gx1 - 0.5, gy1 - 0.5), gx2 - gx1, gy2 - gy1,
+                        linewidth=2, edgecolor='cyan', facecolor='none'
+                    )
+                    ax.add_patch(rect)
+                    ax.set_title(f"feat {col}", fontsize=9)
+                    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+                plt.tight_layout()
+                plt.show()
         
         # Find best score
         label_scores.sort(key=lambda x: x['score'], reverse=True)
